@@ -2,13 +2,13 @@
   "skus": {
     "B0961005_S_4894436008671": {
       "product_name": "G-NiiB Immunity+ \u76ca\u751f\u83cc 28\u5305",
-      "status": "active",
-      "current_phase": 0,
+      "status": "pending",
+      "current_phase": -1,
       "phases": [
         {
           "label": "Traffic Driver to KA Project",
-          "time": "2026-08-25T14:54:22.657324",
-          "end_time": "2026-11-23T14:59:22.657324",
+          "time": "2026-08-25T14:59:51.132838",
+          "end_time": "2026-11-23T15:04:51.132838",
           "end_price": 368,
           "original_price": 499,
           "selling_price": 358,
@@ -17,11 +17,10 @@
           "discount_text_sc": "\u9650\u6642\u512a\u60e0 | \u539f\u50f9 99",
           "discount_style": [
             "RED"
-          ],
-          "promo_done": true
+          ]
         }
       ],
-      "last_updated": "2026-08-25T15:00:10.632093"
+      "last_updated": ""
     }
   }
 }
