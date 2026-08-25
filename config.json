@@ -1,26 +1,26 @@
 {
   "skus": {
     "B0961005_S_4894436008671": {
-      "product_name": "",
+      "product_name": "G-NiiB Immunity+ \u76ca\u751f\u83cc 28\u5305",
+      "status": "pending",
+      "current_phase": -1,
       "phases": [
         {
           "label": "Traffic Driver to KA Project",
-          "time": "2026-09-04T00:00:00",
-          "end_time": "2026-12-31T23:59:00",
+          "time": "2026-08-25T14:54:22.657324",
+          "end_time": "2026-11-23T14:59:22.657324",
+          "end_price": 368,
           "original_price": 499,
           "selling_price": 358,
-          "discount_text_ch": "限時優惠 | 原價 $499",
+          "discount_text_ch": "\u9650\u6642\u512a\u60e0 | \u539f\u50f9 99",
           "discount_text_en": "Special Offer | RSP499",
-          "discount_text_sc": "限時優惠 | 原價 $499",
+          "discount_text_sc": "\u9650\u6642\u512a\u60e0 | \u539f\u50f9 99",
           "discount_style": [
             "RED"
           ]
         }
       ],
-      "status": "pending",
-      "current_phase": -1,
       "last_updated": ""
     }
-  },
-  "_sha": "de70c5dc44a84a5fc9aef178d107390f79cc0f90"
+  }
 }
