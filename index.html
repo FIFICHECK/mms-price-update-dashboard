@@ -184,24 +184,35 @@
   <div class="modal-box">
     <h2>❓ 使用說明</h2>
     <p><b>基本流程</b>：新增 SKU → 加入促銷階段（每階段：執行時間 + 原價/售價 + 折扣文字 + 格式）→ 系統 cron（每 15 分鐘）到期自動登入 MMS 更新。</p>
-    <p><b>多階段</b>：一個 SKU 可以有多個階段（例如 朝早 85 折 → 夜晚 7 折），各自設定時間，到期逐個執行，列表同時顯示。</p>
-    <p><b>自動還原</b>：每個階段可填「完結後售價」+「完結時間」— 到咗完結時間，系統自動將售價改返你提供嘅價（例如促銷完還原 $368）。</p>
-    <p><b>改價記錄</b>：每次執行會記錄「改前 → 改後」價格（例如 $368 → $358），喺更新記錄頁面睇到。</p>
+    <p><b>多階段</b>：一個 SKU 可以有多個階段（例如 朝早 85 折 → 夜晚 7 折），各自設定時間，到期逐個執行，列表同時顯示進度（如 1/2）。</p>
+    <p><b>促銷 + 自動還原</b>：每個階段可填「完結時間」+「完結後售價」— 系統有兩類動作：<br>
+      &nbsp;&nbsp;💰 <b>促銷</b>（執行時間到）→ 改原價/售價/折扣文字<br>
+      &nbsp;&nbsp;🔄 <b>還原</b>（完結時間到）→ 自動將售價改返「完結後售價」（例如促銷完還原 $368）</p>
+    <p><b>改價記錄</b>：每次執行會記錄「改前 → 改後」價格（例如 $368 → $358），喺「📝 更新記錄」頁面睇到。</p>
     <p><b>欄位說明</b>：</p>
     <ul>
-      <li><b>SKU ID</b>：完整格式 <code>商店ID_S_SKUID</code>，例如 <code>B0961005_S_4891133140895_24</code></li>
+      <li><b>SKU ID</b>：完整格式 <code>商店ID_S_SKUID</code>，例如 <code>B0961005_S_4891133140895_24</code>；列表/記錄中嘅 SKU 連結會帶埋前綴</li>
+      <li><b>執行時間</b>：幾時改價（促銷開始）</li>
+      <li><b>完結時間</b>：促銷期完結（可選）</li>
       <li><b>售價 = 0</b>：取消促銷</li>
-      <li><b>折扣文字格式</b>：Style 1 紅 / Style 2 灰刪除線 / Style 3 黑 / Style 4 藍，可多選</li>
-      <li><b>監察時段</b>：自動 = 第一階段執行開始 → 最後階段時間完結，唔使手動填</li>
+      <li><b>完結後售價</b>：完結時間到後自動改返呢個價（可選）</li>
+      <li><b>折扣文字格式</b>：Style 1 紅 / Style 2 灰刪除線 / Style 3 黑 / Style 4 藍，可多選；若 MMS 鎖死（disabled）會自動偵測，一致就當 OK</li>
+      <li><b>監察時段</b>：自動 = 第一階段執行開始 → 最後階段完結時間，唔使手動填</li>
+    </ul>
+    <p><b>頂部卡片</b>：</p>
+    <ul>
+      <li>🔄 <b>Next Check</b>：cron 下次檢查倒數（每 15 分鐘邊界），Hover 睇實際時間</li>
+      <li>🔄 <b>Auto Refresh</b>：頁面自動刷新倒數（每 2 分鐘），Hover 睇實際時間</li>
+      <li><b>🔄 刷新按鈕</b>：手動即時刷新（唔跟 Next Check / Auto Refresh）</li>
     </ul>
     <p><b>狀態說明</b>：</p>
     <ul>
       <li><span class="badge pending">待執行</span> 未開始</li>
       <li><span class="badge active">執行中</span> 部分階段已完成</li>
-      <li><span class="badge completed">已完成</span> 全部階段完成</li>
+      <li><span class="badge completed">已完成</span> 全部階段完成（含還原）</li>
       <li><span class="badge failed">失敗</span> 更新失敗（檢查 MMS 登入/SKU 是否存在）</li>
     </ul>
-    <p><b>價格監察</b>：每小時自動 check MMS 上已完成 SKU 嘅實際價，如有變會通知。</p>
+    <p><b>價格監察</b>：每小時自動 check MMS 上執行中/已完成 SKU 嘅實際價（監察時段內），如有變會通知。</p>
     <br>
     <button onclick="closeHelp()">關閉</button>
   </div>
