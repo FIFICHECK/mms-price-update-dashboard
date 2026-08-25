@@ -208,9 +208,9 @@ class MMSPriceUpdater:
         print(f'    Style: {clicked} targets={styles}')
         return 'ok' in str(clicked)
 
-    def update_price(self, sku, entry):
+    def update_price(self, sku, phase, label=''):
         sku_id = sku.split('_S_')[-1] if '_S_' in sku else sku
-        print(f'  💰 {sku}...')
+        print(f'  💰 [{label}] {sku}...')
         try:
             self.page.goto('https://merchant.shoalter.com/product-management/product-list', wait_until='load', timeout=45000)
             time.sleep(3)
@@ -248,23 +248,23 @@ class MMSPriceUpdater:
             time.sleep(1)
 
             # 1. Original price
-            if entry.get('original_price') is not None:
-                self._fill_react_input('#originalPrice', entry['original_price'])
+            if phase.get('original_price') is not None:
+                self._fill_react_input('#originalPrice', phase['original_price'])
                 time.sleep(0.5)
             # 2. Selling price
-            if entry.get('selling_price') is not None:
-                self._fill_react_input('#sellingPrice', entry['selling_price'])
+            if phase.get('selling_price') is not None:
+                self._fill_react_input('#sellingPrice', phase['selling_price'])
                 time.sleep(0.5)
             # 3-5. Discount texts
             for sel, key in [('#discountTextCh', 'discount_text_ch'),
                              ('#discountTextEn', 'discount_text_en'),
                              ('#discountTextSc', 'discount_text_sc')]:
-                if entry.get(key):
-                    self._fill_react_textarea(sel, entry[key])
+                if phase.get(key):
+                    self._fill_react_textarea(sel, phase[key])
                     time.sleep(0.4)
             # 6. Discount style (optional)
-            if entry.get('discount_style') is not None:
-                self._set_discount_style(entry['discount_style'])
+            if phase.get('discount_style') is not None:
+                self._set_discount_style(phase['discount_style'])
 
             # Verify values were accepted (read back DOM state)
             time.sleep(0.8)
@@ -281,12 +281,12 @@ class MMSPriceUpdater:
             print(f'    Verify: {verify}')
             try:
                 v = json.loads(verify)
-                if entry.get('original_price') is not None and v.get('originalPrice') is not None:
-                    if abs(float(v['originalPrice']) - float(entry['original_price'])) > 0.01:
-                        print(f'    ⚠️  originalPrice mismatch: {v["originalPrice"]} vs {entry["original_price"]}')
-                if entry.get('selling_price') is not None and v.get('sellingPrice') is not None:
-                    if abs(float(v['sellingPrice']) - float(entry['selling_price'])) > 0.01:
-                        print(f'    ⚠️  sellingPrice mismatch: {v["sellingPrice"]} vs {entry["selling_price"]}')
+                if phase.get('original_price') is not None and v.get('originalPrice') is not None:
+                    if abs(float(v['originalPrice']) - float(phase['original_price'])) > 0.01:
+                        print(f'    ⚠️  originalPrice mismatch: {v["originalPrice"]} vs {phase["original_price"]}')
+                if phase.get('selling_price') is not None and v.get('sellingPrice') is not None:
+                    if abs(float(v['sellingPrice']) - float(phase['selling_price'])) > 0.01:
+                        print(f'    ⚠️  sellingPrice mismatch: {v["sellingPrice"]} vs {phase["selling_price"]}')
             except Exception as e:
                 print(f'    ⚠️  verify parse: {e}')
 
@@ -317,10 +317,10 @@ class MMSPriceUpdater:
         results = []
         try:
             self.login()
-            for sku, entry in actions:
-                ok = self.update_price(sku, entry)
-                results.append({'sku': sku, 'success': ok,
-                                'fields': {k: v for k, v in entry.items() if k != 'product_name'}})
+            for sku, phase, label in actions:
+                ok = self.update_price(sku, phase, label)
+                results.append({'sku': sku, 'label': label, 'success': ok,
+                                'fields': {k: v for k, v in phase.items() if k not in ('time', 'label')}})
                 time.sleep(2)
         finally:
             self.stop()
@@ -358,29 +358,45 @@ def main():
         if status == 'completed':
             print(f'  ⏭️  {sku}: completed')
             continue
-        st = entry.get('scheduled_time')
-        if not st:
-            print(f'  ⏳ {sku}: no scheduled_time')
+        phases = entry.get('phases', [])
+        if not phases:
+            print(f'  ⏳ {sku}: no phases')
             continue
-        try:
-            due = now >= datetime.fromisoformat(st)
-        except Exception:
-            due = False
-        if due:
-            print(f'  🟢 {sku}: due ({st})')
-            actions.append((sku, entry))
-        else:
+        current_phase = entry.get('current_phase', -1)
+        next_phase = -1
+        for i in range(current_phase + 1, len(phases)):
+            p = phases[i]
+            if not p.get('time'):
+                continue
             try:
-                mins = int((datetime.fromisoformat(st) - now).total_seconds() / 60)
-                print(f'  ⏳ {sku}: in {mins} min')
+                if now >= datetime.fromisoformat(p['time']):
+                    next_phase = i
+                    break
             except Exception:
                 pass
+        if next_phase >= 0:
+            p = phases[next_phase]
+            print(f'  🟢 {sku}: Phase {next_phase+1} [{p.get("label","")}] ({p.get("time","")})')
+            actions.append((sku, p, p.get('label', f'Phase {next_phase+1}')))
+            config['skus'][sku]['_next_phase'] = next_phase
+        else:
+            for i in range(current_phase + 1, len(phases)):
+                p = phases[i]
+                if p.get('time'):
+                    try:
+                        pt = datetime.fromisoformat(p['time'])
+                        if pt > now:
+                            mins = int((pt - now).total_seconds() / 60)
+                            print(f'  ⏳ {sku}: Phase {i+1} in {mins} min [{p.get("label","")}]')
+                            break
+                    except Exception:
+                        pass
 
     if not actions:
         print('✅ No actions needed')
         return
 
-    print(f'\n📦 {len(actions)} SKU(s) to update')
+    print(f'\n📦 {len(actions)} phase(s) to update')
     updater = MMSPriceUpdater()
     results = updater.run(actions)
 
@@ -389,8 +405,13 @@ def main():
         ok = r['success']
         if sku in config['skus'] and not DRY_RUN:
             if ok:
-                config['skus'][sku]['status'] = 'completed'
+                np = config['skus'][sku].pop('_next_phase', -1)
+                config['skus'][sku]['current_phase'] = np
                 config['skus'][sku]['last_updated'] = now.isoformat()
+                if np >= len(config['skus'][sku].get('phases', [])) - 1:
+                    config['skus'][sku]['status'] = 'completed'
+                else:
+                    config['skus'][sku]['status'] = 'active'
             else:
                 config['skus'][sku]['status'] = 'failed'
 
@@ -400,6 +421,7 @@ def main():
     for r in results:
         dashboard['history'].append({
             'sku': r['sku'],
+            'label': r.get('label', ''),
             'fields': r.get('fields', {}),
             'status': 'success' if r['success'] else 'failed',
             'time': now.isoformat()

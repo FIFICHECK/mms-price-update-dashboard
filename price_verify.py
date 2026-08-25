@@ -148,7 +148,7 @@ def main():
         print('✅ No SKUs configured', flush=True)
         return
 
-    # Select SKUs to verify: completed (already updated) AND (no verify_until OR verify_until >= today)
+    # Select SKUs to verify: completed (all phases done) AND (no verify_until OR verify_until >= today)
     today = now.date().isoformat()
     targets = {}
     for sku, entry in skus.items():
@@ -157,7 +157,16 @@ def main():
         vu = entry.get('verify_until')
         if vu and vu < today:
             continue
-        targets[sku] = entry
+        phases = entry.get('phases', [])
+        if not phases:
+            # Legacy single-shot format: use entry fields directly
+            targets[sku] = {'entry': entry, 'phase': entry}
+            continue
+        # Last executed phase = current_phase (or last phase if completed)
+        last_idx = entry.get('current_phase', len(phases) - 1)
+        if last_idx < 0 or last_idx >= len(phases):
+            last_idx = len(phases) - 1
+        targets[sku] = {'entry': entry, 'phase': phases[last_idx]}
 
     if not targets:
         print('✅ No completed SKUs to verify', flush=True)
@@ -172,7 +181,9 @@ def main():
         if not verifier.login():
             print('❌ MMS login failed', flush=True)
             return
-        for sku, entry in targets.items():
+        for sku, tinfo in targets.items():
+            entry = tinfo['entry']
+            phase = tinfo['phase']
             print(f'  👀 {sku}...', flush=True)
             vals, err = verifier.read_prices(sku)
             if err:
@@ -181,15 +192,15 @@ def main():
                 continue
             op_now = num(vals.get('originalPrice'))
             sp_now = num(vals.get('sellingPrice'))
-            op_cfg = num(entry.get('original_price'))
-            sp_cfg = num(entry.get('selling_price'))
+            op_cfg = num(phase.get('original_price'))
+            sp_cfg = num(phase.get('selling_price'))
             changed = []
             if op_cfg is not None and op_now is not None and abs(op_now - op_cfg) > 0.01:
                 changed.append(('原價', op_cfg, op_now))
             if sp_cfg is not None and sp_now is not None and abs(sp_now - sp_cfg) > 0.01:
                 changed.append(('售價', sp_cfg, sp_now))
             if changed:
-                drifts.append((sku, entry, changed))
+                drifts.append((sku, {'entry': entry, 'phase': phase}, changed))
                 print(f'    ⚠️  DRIFT: {changed}', flush=True)
             else:
                 print(f'    ✅ OK (orig={op_now}, sell={sp_now})', flush=True)
@@ -206,12 +217,15 @@ def main():
     print('⚠️  **MMS 價格變更偵測**', flush=True)
     print(f'📅 檢查時間: {now.strftime("%Y-%m-%d %H:%M")}', flush=True)
     print('', flush=True)
-    for sku, entry, changed in drifts:
+    for sku, tinfo in drifts:
+        entry = tinfo[1]['entry']
+        phase = tinfo[1]['phase']
+        changed = tinfo[2]
         name = entry.get('product_name', '')
         print(f'**{sku}**', flush=True)
         if name:
             print(f'  📦 {name}', flush=True)
-        print(f'  ⏰ 原排程時間: {entry.get("scheduled_time", "—")}', flush=True)
+        print(f'  ⏰ 最後執行時間: {entry.get("last_updated", "—")}', flush=True)
         for label, cfg_val, now_val in changed:
             print(f'  ⚠️  {label}: ${cfg_val} → ${now_val}（被人改過！）', flush=True)
         print('', flush=True)

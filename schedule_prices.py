@@ -54,14 +54,21 @@ def main():
     for sku, entry in skus.items():
         if entry.get('status') == 'completed':
             continue
-        st = entry.get('scheduled_time')
-        if not st:
+        phases = entry.get('phases', [])
+        if not phases:
             continue
-        try:
-            if now >= datetime.fromisoformat(st):
-                due.append(sku)
-        except Exception:
-            pass
+        current_phase = entry.get('current_phase', -1)
+        for i in range(current_phase + 1, len(phases)):
+            p = phases[i]
+            st = p.get('time')
+            if not st:
+                continue
+            try:
+                if now >= datetime.fromisoformat(st):
+                    due.append(sku)
+                    break
+            except Exception:
+                pass
 
     if not due:
         print('✅ Nothing due')

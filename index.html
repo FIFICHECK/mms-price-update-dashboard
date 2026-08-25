@@ -26,13 +26,14 @@
   td { padding: 8px; text-align: center; border-bottom: 1px solid #21262d; }
   tr:hover { background: #1c2129; }
   input, textarea, select { background: #0d1117; border: 1px solid var(--border); color: var(--text); border-radius: 6px; padding: 8px; font-size: 0.85rem; width: 100%; }
-  textarea { resize: vertical; min-height: 40px; }
+  textarea { resize: vertical; min-height: 38px; }
   label { display: block; font-size: 0.8rem; color: var(--dim); margin: 10px 0 4px; }
   .row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
   .row3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
   button { background: var(--accent); color: #000; border: none; border-radius: 6px; padding: 8px 16px; font-size: 0.85rem; font-weight: 600; cursor: pointer; }
   button.secondary { background: #21262d; color: var(--text); }
   button.danger { background: var(--err); color: #fff; }
+  button.ghost { background: none; border: 1px solid var(--border); color: var(--dim); }
   .badge { display: inline-block; padding: 2px 10px; border-radius: 12px; font-size: 0.75rem; font-weight: 600; }
   .badge.pending { background: #1f6feb33; color: #58a6ff; }
   .badge.active { background: #3fb95022; color: var(--ok); }
@@ -59,6 +60,9 @@
   .modal-box h2 { color: var(--accent); margin-bottom: 12px; }
   .modal-box p, .modal-box li { font-size: 0.85rem; line-height: 1.6; color: var(--text); }
   .modal-box ul { padding-left: 18px; }
+  .phase-box { border: 1px solid var(--border); border-radius: 10px; padding: 14px; margin: 14px 0; background: #10151c; }
+  .phase-box h4 { color: var(--accent); font-size: 0.9rem; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; }
+  .phase-box .row { margin-bottom: 4px; }
   @media (max-width: 720px) { .row, .row3 { grid-template-columns: 1fr; } table { font-size: 0.7rem; } }
 </style>
 </head>
@@ -82,7 +86,8 @@
   <div class="stats">
     <div class="stat"><h3>總 SKU</h3><div class="num" id="st-total">0</div></div>
     <div class="stat"><h3>待執行</h3><div class="num" style="color:#58a6ff" id="st-pending">0</div></div>
-    <div class="stat"><h3>已完成</h3><div class="num" style="color:#3fb950" id="st-completed">0</div></div>
+    <div class="stat"><h3>執行中</h3><div class="num" style="color:#3fb950" id="st-active">0</div></div>
+    <div class="stat"><h3>已完成</h3><div class="num" style="color:#8b949e" id="st-completed">0</div></div>
     <div class="stat"><h3>失敗</h3><div class="num" style="color:#f85149" id="st-failed">0</div></div>
   </div>
   <div class="card">
@@ -95,67 +100,54 @@
     <table>
       <thead>
         <tr>
-          <th style="width:4%"><input type="checkbox" id="selAll" onchange="toggleAll()"></th>
           <th style="width:20%">SKU</th>
-          <th style="width:18%">商品名稱</th>
-          <th style="width:8%">原價</th>
-          <th style="width:8%">售價</th>
-          <th style="width:18%">折扣文字</th>
-          <th style="width:10%">格式</th>
-          <th style="width:11%">執行時間</th>
-          <th style="width:7%">監察</th>
+          <th style="width:16%">商品名稱</th>
+          <th style="width:7%">進度</th>
+          <th style="width:11%">下一階段時間</th>
+          <th style="width:9%">下一售價</th>
+          <th style="width:12%">階段標籤</th>
+          <th style="width:8%">監察至</th>
           <th style="width:8%">狀態</th>
-          <th style="width:6%">操作</th>
+          <th style="width:9%">操作</th>
         </tr>
       </thead>
       <tbody id="skuBody"></tbody>
     </table>
     <div id="emptyHint" style="text-align:center;color:var(--dim);padding:20px;display:none">暫無 SKU — 去「➕ 新增/編輯」加入第一個</div>
   </div>
+  <div id="doneSection" style="display:none">
+    <h3 style="color:var(--dim);font-size:0.9rem;margin-bottom:8px">🔵 已完成</h3>
+    <div class="card">
+      <table>
+        <thead><tr><th style="width:20%">SKU</th><th style="width:16%">商品名稱</th><th style="width:7%">進度</th><th style="width:11%">最後執行</th><th style="width:9%">最後售價</th><th style="width:12%">階段標籤</th><th style="width:8%">監察至</th><th style="width:8%">狀態</th><th style="width:9%">操作</th></tr></thead>
+        <tbody id="doneBody"></tbody>
+      </table>
+    </div>
+  </div>
 </div>
 
 <!-- Tab 2: Add/Edit -->
 <div id="tab-add-panel" style="display:none">
-  <div class="card" style="max-width:760px">
+  <div class="card" style="max-width:860px">
     <h2 id="formTitle" style="color:var(--accent);font-size:1.1rem;margin-bottom:8px">➕ 新增 SKU</h2>
     <input type="hidden" id="editKey">
-    <label>SKU ID（例如 B0961005_S_4891133140895_24）*</label>
-    <input id="skuId" placeholder="B0961005_S_4891133140895_24">
-    <label>商品名稱（留空自動抓取）</label>
-    <input id="productName" placeholder="商品名稱">
     <div class="row">
       <div>
-        <label>原價 (港幣) *</label>
-        <input id="origPrice" type="number" step="0.1" min="0" placeholder="例如 159.90">
+        <label>SKU ID（例如 B0961005_S_4891133140895_24）*</label>
+        <input id="skuId" placeholder="B0961005_S_4891133140895_24">
       </div>
       <div>
-        <label>售價 (港幣) *（輸入 0 以取消促銷）</label>
-        <input id="sellPrice" type="number" step="0.1" min="0" placeholder="例如 63.90">
+        <label>商品名稱（留空自動抓取）</label>
+        <input id="productName" placeholder="商品名稱">
       </div>
     </div>
-    <label>折扣文字描述 (繁體中文)</label>
-    <textarea id="discCh" placeholder="請輸入折扣文字描述 (繁體中文)"></textarea>
-    <div class="row">
-      <div>
-        <label>折扣文字描述 (英文)</label>
-        <textarea id="discEn" placeholder="請輸入折扣文字描述 (英文)"></textarea>
-      </div>
-      <div>
-        <label>折扣文字描述 (簡體中文)</label>
-        <textarea id="discSc" placeholder="請輸入折扣文字描述 (簡體中文)"></textarea>
-      </div>
-    </div>
-    <label>折扣文字格式（可選，可多選）</label>
-    <div class="style-chk">
-      <label><input type="checkbox" class="styleBox" value="RED"> <span style="color:#f85149">Style 1</span></label>
-      <label><input type="checkbox" class="styleBox" value="GREY"> <span style="color:#8b949e;text-decoration:line-through">Style 2</span></label>
-      <label><input type="checkbox" class="styleBox" value="BLACK"> <span>Style 3</span></label>
-      <label><input type="checkbox" class="styleBox" value="BLUE"> <span style="color:#58a6ff">Style 4</span></label>
-    </div>
-    <label>執行時間 *</label>
-    <input id="schedTime" type="datetime-local">
-    <label>監察至（可選）— 促銷期結束日期，之後唔再 check 有冇被人改價</label>
-    <input id="verifyUntil" type="date">
+    <label>監察至（可選）— 全部階段完成後監察價格至呢個日期；留空 = 永久監察</label>
+    <input id="verifyUntil" type="date" style="max-width:220px">
+
+    <h3 style="color:var(--accent);font-size:1rem;margin-top:18px">📅 促銷階段（每個階段 = 一個時段嘅價格設定）</h3>
+    <div id="phaseEditor"></div>
+    <button class="secondary" onclick="addPhase()" style="margin-top:6px">➕ 增加階段</button>
+
     <div style="display:flex;gap:10px;margin-top:18px">
       <button onclick="saveSku()">💾 儲存</button>
       <button class="secondary" onclick="clearForm()">清除</button>
@@ -169,11 +161,12 @@
     <table>
       <thead>
         <tr>
-          <th style="width:15%">時間</th>
-          <th style="width:22%">SKU</th>
-          <th style="width:35%">更新內容</th>
+          <th style="width:14%">時間</th>
+          <th style="width:20%">SKU</th>
+          <th style="width:12%">階段</th>
+          <th style="width:36%">更新內容</th>
           <th style="width:10%">結果</th>
-          <th style="width:6%">刪除</th>
+          <th style="width:8%">刪除</th>
         </tr>
       </thead>
       <tbody id="logBody"></tbody>
@@ -187,21 +180,23 @@
 <div class="modal" id="helpModal" onclick="if(event.target===this)closeHelp()">
   <div class="modal-box">
     <h2>❓ 使用說明</h2>
-    <p><b>基本流程</b>：新增 SKU → 填促銷資料（原價/售價/折扣文字/格式）→ 設定執行時間 → 系統 cron（每 15 分鐘）到期自動登入 MMS 更新。</p>
+    <p><b>基本流程</b>：新增 SKU → 加入促銷階段（每階段：執行時間 + 原價/售價 + 折扣文字 + 格式）→ 系統 cron（每 15 分鐘）到期自動登入 MMS 更新。</p>
+    <p><b>多階段</b>：一個 SKU 可以有多個階段（例如 朝早 85 折 → 夜晚 7 折），各自設定時間，到期逐個執行，列表同時顯示。</p>
     <p><b>欄位說明</b>：</p>
     <ul>
       <li><b>SKU ID</b>：完整格式 <code>商店ID_S_SKUID</code>，例如 <code>B0961005_S_4891133140895_24</code></li>
       <li><b>售價 = 0</b>：取消促銷</li>
       <li><b>折扣文字格式</b>：Style 1 紅 / Style 2 灰刪除線 / Style 3 黑 / Style 4 藍，可多選</li>
+      <li><b>監察至</b>：促銷期結束後停止檢查價格有冇俾人改</li>
     </ul>
     <p><b>狀態說明</b>：</p>
     <ul>
-      <li><span class="badge pending">待執行</span> 已設定，等待執行時間</li>
-      <li><span class="badge active">執行中/成功</span> 已更新</li>
+      <li><span class="badge pending">待執行</span> 未開始</li>
+      <li><span class="badge active">執行中</span> 部分階段已完成</li>
+      <li><span class="badge completed">已完成</span> 全部階段完成</li>
       <li><span class="badge failed">失敗</span> 更新失敗（檢查 MMS 登入/SKU 是否存在）</li>
-      <li><span class="badge completed">已完成</span> 完成</li>
     </ul>
-    <p><b>注意</b>：MMS session 有時會過期；失敗會自動記錄原因。資料儲存於 GitHub repo 嘅 config.json。</p>
+    <p><b>價格監察</b>：每小時自動 check MMS 上已完成 SKU 嘅實際價，如有變會通知。</p>
     <br>
     <button onclick="closeHelp()">關閉</button>
   </div>
@@ -281,60 +276,140 @@ function stylePreview(arr) {
   return arr.map(function(s){ return names[s]||s; }).join(', ');
 }
 
+function phaseLabel(p, idx) {
+  return p && p.label ? p.label : ('階段 ' + (idx+1));
+}
+function phasePrice(p) {
+  if (!p) return '—';
+  var sp = p.selling_price;
+  if (sp === null || sp === undefined || sp === '') return '—';
+  return '$' + sp;
+}
+
 function renderList() {
   var q = (document.getElementById('searchInput').value||'').toLowerCase();
   var keys = Object.keys(config.skus || {});
-  var total=keys.length, pending=0, completed=0, failed=0;
-  keys.forEach(function(k){ var s=config.skus[k].status||'pending'; if(s==='completed')completed++; else if(s==='failed')failed++; else pending++; });
+  var total=keys.length, pending=0, active=0, completed=0, failed=0;
+  keys.forEach(function(k){ var s=config.skus[k].status||'pending'; if(s==='completed')completed++; else if(s==='failed')failed++; else if(s==='active')active++; else pending++; });
   document.getElementById('st-total').textContent=total;
   document.getElementById('st-pending').textContent=pending;
+  document.getElementById('st-active').textContent=active;
   document.getElementById('st-completed').textContent=completed;
   document.getElementById('st-failed').textContent=failed;
-  var h='';
+  var h='', dh='';
   keys.forEach(function(k){
     var e=config.skus[k]||{};
     if (q && k.toLowerCase().indexOf(q)<0 && (e.product_name||'').toLowerCase().indexOf(q)<0) return;
     var st=e.status||'pending';
-    var disc = [e.discount_text_ch, e.discount_text_en, e.discount_text_sc].filter(Boolean).join(' / ') || '—';
+    var phases=e.phases||[];
+    var cp=e.current_phase!=null?e.current_phase:-1;
+    // Next pending phase (after current)
+    var nextIdx=-1, nextP=null;
+    for (var i=cp+1;i<phases.length;i++){ if(phases[i]&&phases[i].time){ nextIdx=i; nextP=phases[i]; break; } }
+    var lastIdx = cp>=0?cp:(phases.length-1);
+    var lastP = phases[lastIdx]||null;
+    var progress = phases.length ? (cp+1)+'/'+phases.length : '—';
     var skuShort = k.split('_S_')[1] || k;
-    h += '<tr>'
-      + '<td><input type="checkbox" class="skuSel" value="'+esc(k)+'"></td>'
+    var row = '<tr>'
       + '<td><a class="link" target="_blank" href="https://www.hktvmall.com/hktv/p/'+esc(skuShort)+'">'+esc(k)+'</a></td>'
       + '<td>'+esc(e.product_name||'—')+'</td>'
-      + '<td>'+(e.original_price!=null?'$'+e.original_price:'—')+'</td>'
-      + '<td>'+(e.selling_price!=null?'$'+e.selling_price:'—')+'</td>'
-      + '<td style="font-size:0.72rem">'+esc(disc)+'</td>'
-      + '<td>'+esc(stylePreview(e.discount_style))+'</td>'
-      + '<td>'+fmtTime(e.scheduled_time)+'</td>'
+      + '<td>'+progress+'</td>'
+      + '<td>'+fmtTime(nextP?nextP.time:(st==='completed'?e.last_updated:null))+'</td>'
+      + '<td>'+phasePrice(nextP||lastP)+'</td>'
+      + '<td style="font-size:0.72rem">'+esc(phaseLabel(nextP,nextIdx<0?lastIdx:nextIdx))+'</td>'
       + '<td>'+(e.verify_until?'至 '+esc(e.verify_until):'—')+'</td>'
       + '<td>'+badge(st)+'</td>'
       + '<td><button class="edit" title="編輯" onclick="editSku(\''+esc(k)+'\')">✎</button> '
       + '<button class="del" title="刪除" onclick="delSku(\''+esc(k)+'\')">✕</button></td>'
       + '</tr>';
+    if (st==='completed') dh += row; else h += row;
   });
-  document.getElementById('skuBody').innerHTML = h || '<tr><td colspan="11" style="color:var(--dim)">無符合 SKU</td></tr>';
+  document.getElementById('skuBody').innerHTML = h || '<tr><td colspan="9" style="color:var(--dim)">無符合 SKU</td></tr>';
+  document.getElementById('doneBody').innerHTML = dh;
+  document.getElementById('doneSection').style.display = dh ? 'block' : 'none';
   document.getElementById('emptyHint').style.display = total ? 'none' : 'block';
 }
-function toggleAll() { var c=document.getElementById('selAll').checked; document.querySelectorAll('.skuSel').forEach(function(x){x.checked=c;}); }
+
+// ========== Phase Editor ==========
+var phaseState = []; // {label, time, original_price, selling_price, discount_text_ch/en/sc, discount_style[]}
+
+function addPhase(p) {
+  p = p || {};
+  phaseState.push({
+    label: p.label || '',
+    time: p.time ? p.time.slice(0,16) : '',
+    original_price: p.original_price!=null?p.original_price:'',
+    selling_price: p.selling_price!=null?p.selling_price:'',
+    discount_text_ch: p.discount_text_ch||'',
+    discount_text_en: p.discount_text_en||'',
+    discount_text_sc: p.discount_text_sc||'',
+    discount_style: p.discount_style||[]
+  });
+  renderPhases();
+}
+function removePhase(idx) { phaseState.splice(idx,1); renderPhases(); }
+function renderPhases() {
+  var box=document.getElementById('phaseEditor');
+  if (!phaseState.length) { box.innerHTML='<div style="color:var(--dim);font-size:0.8rem;padding:8px 0">未加入階段 — 撳「➕ 增加階段」</div>'; return; }
+  var h='';
+  phaseState.forEach(function(p, i){
+    var st1 = p.discount_style.indexOf('RED')>=0?'checked':'';
+    var st2 = p.discount_style.indexOf('GREY')>=0?'checked':'';
+    var st3 = p.discount_style.indexOf('BLACK')>=0?'checked':'';
+    var st4 = p.discount_style.indexOf('BLUE')>=0?'checked':'';
+    h += '<div class="phase-box">'
+      + '<h4>階段 '+(i+1)+' <button class="del" title="刪除此階段" onclick="removePhase('+i+')">✕</button></h4>'
+      + '<div class="row">'
+      +   '<div><label>執行時間 *</label><input type="datetime-local" value="'+esc(p.time)+'" oninput="phaseState['+i+'].time=this.value"></div>'
+      +   '<div><label>階段標籤（可選）</label><input placeholder="例如 朝早85折 / 夜晚7折" value="'+esc(p.label)+'" oninput="phaseState['+i+'].label=this.value"></div>'
+      + '</div>'
+      + '<div class="row">'
+      +   '<div><label>原價 (港幣)</label><input type="number" step="0.1" min="0" placeholder="例如 159.90" value="'+esc(p.original_price)+'" oninput="phaseState['+i+'].original_price=this.value===\'\'?null:parseFloat(this.value)"></div>'
+      +   '<div><label>售價 (港幣) *（0 = 取消促銷）</label><input type="number" step="0.1" min="0" placeholder="例如 63.90" value="'+esc(p.selling_price)+'" oninput="phaseState['+i+'].selling_price=this.value===\'\'?null:parseFloat(this.value)"></div>'
+      + '</div>'
+      + '<label>折扣文字描述 (繁體中文)</label><textarea placeholder="請輸入折扣文字描述 (繁體中文)" oninput="phaseState['+i+'].discount_text_ch=this.value">'+esc(p.discount_text_ch)+'</textarea>'
+      + '<div class="row">'
+      +   '<div><label>折扣文字描述 (英文)</label><textarea placeholder="請輸入折扣文字描述 (英文)" oninput="phaseState['+i+'].discount_text_en=this.value">'+esc(p.discount_text_en)+'</textarea></div>'
+      +   '<div><label>折扣文字描述 (簡體中文)</label><textarea placeholder="請輸入折扣文字描述 (簡體中文)" oninput="phaseState['+i+'].discount_text_sc=this.value">'+esc(p.discount_text_sc)+'</textarea></div>'
+      + '</div>'
+      + '<label>折扣文字格式（可選，可多選）</label>'
+      + '<div class="style-chk">'
+      +   '<label><input type="checkbox" class="ph'+i+'st" value="RED" '+st1+' onchange="toggleStyle('+i+',this)"> <span style="color:#f85149">Style 1</span></label>'
+      +   '<label><input type="checkbox" class="ph'+i+'st" value="GREY" '+st2+' onchange="toggleStyle('+i+',this)"> <span style="color:#8b949e;text-decoration:line-through">Style 2</span></label>'
+      +   '<label><input type="checkbox" class="ph'+i+'st" value="BLACK" '+st3+' onchange="toggleStyle('+i+',this)"> <span>Style 3</span></label>'
+      +   '<label><input type="checkbox" class="ph'+i+'st" value="BLUE" '+st4+' onchange="toggleStyle('+i+',this)"> <span style="color:#58a6ff">Style 4</span></label>'
+      + '</div>'
+      + '</div>';
+  });
+  box.innerHTML=h;
+}
+function toggleStyle(i, cb) {
+  var arr = phaseState[i].discount_style;
+  var v = cb.value;
+  if (cb.checked) { if (arr.indexOf(v)<0) arr.push(v); }
+  else { var ix=arr.indexOf(v); if (ix>=0) arr.splice(ix,1); }
+}
+
+// ========== Save / Edit ==========
 function editSku(k) {
   var e=config.skus[k]||{};
   document.getElementById('editKey').value=k;
   document.getElementById('skuId').value=k;
   document.getElementById('productName').value=e.product_name||'';
-  document.getElementById('origPrice').value=e.original_price!=null?e.original_price:'';
-  document.getElementById('sellPrice').value=e.selling_price!=null?e.selling_price:'';
-  document.getElementById('discCh').value=e.discount_text_ch||'';
-  document.getElementById('discEn').value=e.discount_text_en||'';
-  document.getElementById('discSc').value=e.discount_text_sc||'';
-  document.querySelectorAll('.styleBox').forEach(function(cb){ cb.checked=(e.discount_style||[]).indexOf(cb.value)>=0; });
-  document.getElementById('schedTime').value=e.scheduled_time?e.scheduled_time.slice(0,16):'';
   document.getElementById('verifyUntil').value=e.verify_until||'';
+  phaseState = [];
+  (e.phases||[]).forEach(function(p){ addPhase(p); });
+  if (!phaseState.length) addPhase();
   document.getElementById('formTitle').textContent='✎ 編輯 SKU — '+k;
   showTab('add');
 }
 function clearForm() {
-  ['editKey','skuId','productName','origPrice','sellPrice','discCh','discEn','discSc','schedTime','verifyUntil'].forEach(function(i){document.getElementById(i).value='';});
-  document.querySelectorAll('.styleBox').forEach(function(cb){cb.checked=false;});
+  document.getElementById('editKey').value='';
+  document.getElementById('skuId').value='';
+  document.getElementById('productName').value='';
+  document.getElementById('verifyUntil').value='';
+  phaseState = [];
+  addPhase();
   document.getElementById('formTitle').textContent='➕ 新增 SKU';
   showTab('add');
 }
@@ -342,29 +417,29 @@ function saveSku() {
   var key=document.getElementById('editKey').value;
   var sku=document.getElementById('skuId').value.trim();
   if(!sku){ showMsg('⚠️ 請輸入 SKU ID', true); return; }
-  var op=document.getElementById('origPrice').value, sp=document.getElementById('sellPrice').value, st=document.getElementById('schedTime').value;
-  if(op==='' && sp===''){ showMsg('⚠️ 請輸入原價或售價', true); return; }
-  if(!st){ showMsg('⚠️ 請設定執行時間', true); return; }
-  var styles=[]; document.querySelectorAll('.styleBox').forEach(function(cb){ if(cb.checked) styles.push(cb.value); });
+  var validPhases = phaseState.filter(function(p){ return p.time && (p.selling_price!==null && p.selling_price!==''); });
+  if(!validPhases.length){ showMsg('⚠️ 至少一個階段要有執行時間 + 售價', true); return; }
   var e = config.skus[key] || config.skus[sku] || {};
   var entry = {
     product_name: document.getElementById('productName').value.trim() || e.product_name || '',
-    original_price: op!==''?parseFloat(op):(e.original_price!=null?e.original_price:null),
-    selling_price: sp!==''?parseFloat(sp):(e.selling_price!=null?e.selling_price:null),
-    discount_text_ch: document.getElementById('discCh').value.trim(),
-    discount_text_en: document.getElementById('discEn').value.trim(),
-    discount_text_sc: document.getElementById('discSc').value.trim(),
-    discount_style: styles,
-    scheduled_time: st+':00',
+    phases: validPhases.map(function(p){ return {
+      label: p.label||'',
+      time: p.time+':00',
+      original_price: p.original_price!==null&&p.original_price!==''?parseFloat(p.original_price):null,
+      selling_price: parseFloat(p.selling_price),
+      discount_text_ch: (p.discount_text_ch||'').trim(),
+      discount_text_en: (p.discount_text_en||'').trim(),
+      discount_text_sc: (p.discount_text_sc||'').trim(),
+      discount_style: p.discount_style||[]
+    }; }),
     verify_until: document.getElementById('verifyUntil').value || '',
     status: 'pending',
+    current_phase: -1,
     last_updated: ''
   };
-  // Remove the old key if renamed
   if (key && key !== sku) delete config.skus[key];
   config.skus[sku] = entry;
-  var msg = '⏳ 儲存中...';
-  showMsg(msg);
+  showMsg('⏳ 儲存中...');
   apiPut(CU, JSON.stringify(config, null, 2), config._sha, 'Update via dashboard', function(err){
     if (err) { showMsg('❌ 儲存失敗: '+err, true); }
     else { showMsg('✅ 已儲存'); clearForm(); renderList(); }
@@ -393,12 +468,13 @@ function renderLog() {
     return '<tr>'
       + '<td>'+fmtTime(x.time)+'</td>'
       + '<td><a class="link" target="_blank" href="https://www.hktvmall.com/hktv/p/'+esc(skuShort)+'">'+esc(x.sku||'')+'</a></td>'
+      + '<td>'+esc(x.label||'—')+'</td>'
       + '<td style="font-size:0.72rem;text-align:left">'+esc(detail.join('<br>')||'—')+'</td>'
       + '<td>'+(x.status==='success'?'<span class="badge active">✅ OK</span>':'<span class="badge failed">❌ Fail</span>')+'</td>'
       + '<td><button class="del" onclick="delLog(this)">✕</button></td>'
       + '</tr>';
   }).join('');
-  document.getElementById('logBody').innerHTML = h || '<tr><td colspan="5" style="color:var(--dim)">暫無記錄</td></tr>';
+  document.getElementById('logBody').innerHTML = h || '<tr><td colspan="6" style="color:var(--dim)">暫無記錄</td></tr>';
 }
 function delLog(btn) {
   var idx=btn.closest('tr').rowIndex-1;
