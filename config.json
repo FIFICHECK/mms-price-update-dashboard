@@ -20,7 +20,9 @@
           ]
         }
       ],
-      "last_updated": ""
+      "last_updated": "",
+      "_next_phase": 0,
+      "_next_action": "promo"
     }
   }
 }
