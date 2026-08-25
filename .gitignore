@@ -1,0 +1,4 @@
+mms_creds.json
+__pycache__/
+*.pyc
+.venv/

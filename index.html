@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>💰 MMS SKU 促銷價格更新</title>
+<style>
+  :root {
+    --bg: #0d1117; --card: #161b22; --border: #30363d;
+    --text: #e6edf3; --dim: #8b949e; --accent: #f0b90b; --ok: #3fb950; --err: #f85149;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: "Segoe UI", "Microsoft JhengHei", sans-serif; padding: 20px; }
+  .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 10px; }
+  h1 { font-size: 1.5rem; color: var(--accent); }
+  .tabs { display: flex; gap: 8px; margin-bottom: 16px; }
+  .tab { background: var(--card); border: 1px solid var(--border); color: var(--dim); padding: 8px 18px; border-radius: 8px; cursor: pointer; font-size: 0.9rem; }
+  .tab.active { color: var(--accent); border-color: var(--accent); font-weight: 600; }
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 16px; margin-bottom: 16px; }
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-bottom: 16px; }
+  .stat { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 14px; text-align: center; }
+  .stat h3 { color: var(--text); font-size: 0.85rem; font-weight: 700; margin-bottom: 6px; }
+  .stat .num { font-size: 1.4rem; font-weight: 700; }
+  table { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
+  th { background: #21262d; color: #e0e0e0; font-weight: 700; padding: 10px 8px; text-align: center; border-bottom: 2px solid var(--border); }
+  td { padding: 8px; text-align: center; border-bottom: 1px solid #21262d; }
+  tr:hover { background: #1c2129; }
+  input, textarea, select { background: #0d1117; border: 1px solid var(--border); color: var(--text); border-radius: 6px; padding: 8px; font-size: 0.85rem; width: 100%; }
+  textarea { resize: vertical; min-height: 40px; }
+  label { display: block; font-size: 0.8rem; color: var(--dim); margin: 10px 0 4px; }
+  .row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .row3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
+  button { background: var(--accent); color: #000; border: none; border-radius: 6px; padding: 8px 16px; font-size: 0.85rem; font-weight: 600; cursor: pointer; }
+  button.secondary { background: #21262d; color: var(--text); }
+  button.danger { background: var(--err); color: #fff; }
+  .badge { display: inline-block; padding: 2px 10px; border-radius: 12px; font-size: 0.75rem; font-weight: 600; }
+  .badge.pending { background: #1f6feb33; color: #58a6ff; }
+  .badge.active { background: #3fb95022; color: var(--ok); }
+  .badge.completed { background: #8b949e22; color: var(--dim); }
+  .badge.failed { background: #f8514933; color: var(--err); }
+  .style-chk { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 6px; }
+  .style-chk label { display: flex; align-items: center; gap: 5px; margin: 0; cursor: pointer; color: var(--text); font-size: 0.8rem; }
+  .style-chk input { width: auto; }
+  .toolbar { display: flex; justify-content: space-between; margin-bottom: 12px; gap: 10px; flex-wrap: wrap; }
+  .searchbox { position: relative; max-width: 320px; flex: 1; }
+  .searchbox input { padding-left: 30px; }
+  .msg { position: fixed; top: 20px; right: 20px; background: var(--card); border: 1px solid var(--ok); border-radius: 8px; padding: 12px 18px; z-index: 999; display: none; font-size: 0.85rem; }
+  .msg.err { border-color: var(--err); }
+  .footer { margin-top: 20px; color: #e0e0e0; font-size: 0.75rem; text-align: center; }
+  .link { color: var(--accent); text-decoration: none; }
+  .link:hover { text-decoration: underline; }
+  .del { color: var(--err); background: none; border: none; font-size: 1rem; cursor: pointer; }
+  .edit { color: var(--accent); background: none; border: none; font-size: 1rem; cursor: pointer; }
+  .help-btn { width: 32px; height: 32px; border-radius: 50%; background: #e94560; color: #fff; font-weight: bold; font-size: 1rem; border: none; cursor: pointer; transition: transform .15s; }
+  .help-btn:hover { transform: scale(1.1); }
+  .modal { position: fixed; inset: 0; background: rgba(0,0,0,0.7); display: none; align-items: center; justify-content: center; z-index: 1000; }
+  .modal.show { display: flex; }
+  .modal-box { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 24px; max-width: 520px; width: 90%; max-height: 85vh; overflow-y: auto; }
+  .modal-box h2 { color: var(--accent); margin-bottom: 12px; }
+  .modal-box p, .modal-box li { font-size: 0.85rem; line-height: 1.6; color: var(--text); }
+  .modal-box ul { padding-left: 18px; }
+  @media (max-width: 720px) { .row, .row3 { grid-template-columns: 1fr; } table { font-size: 0.7rem; } }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>💰 MMS SKU 促銷價格更新</h1>
+  <div style="display:flex;align-items:center;gap:10px;">
+    <button class="help-btn" onclick="openHelp()">?</button>
+  </div>
+</div>
+
+<div class="tabs">
+  <button class="tab active" onclick="showTab('list')" id="tab-list">📋 SKU 列表</button>
+  <button class="tab" onclick="showTab('add')" id="tab-add">➕ 新增/編輯</button>
+  <button class="tab" onclick="showTab('log')" id="tab-log">📝 更新記錄</button>
+</div>
+
+<!-- Tab 1: SKU List -->
+<div id="tab-list-panel">
+  <div class="stats">
+    <div class="stat"><h3>總 SKU</h3><div class="num" id="st-total">0</div></div>
+    <div class="stat"><h3>待執行</h3><div class="num" style="color:#58a6ff" id="st-pending">0</div></div>
+    <div class="stat"><h3>已完成</h3><div class="num" style="color:#3fb950" id="st-completed">0</div></div>
+    <div class="stat"><h3>失敗</h3><div class="num" style="color:#f85149" id="st-failed">0</div></div>
+  </div>
+  <div class="card">
+    <div class="toolbar">
+      <div class="searchbox">
+        <input placeholder="🔍 搜尋 SKU..." id="searchInput" oninput="renderList()">
+      </div>
+      <button class="secondary" onclick="refreshData()">🔄 刷新</button>
+    </div>
+    <table>
+      <thead>
+        <tr>
+          <th style="width:4%"><input type="checkbox" id="selAll" onchange="toggleAll()"></th>
+          <th style="width:20%">SKU</th>
+          <th style="width:18%">商品名稱</th>
+          <th style="width:8%">原價</th>
+          <th style="width:8%">售價</th>
+          <th style="width:18%">折扣文字</th>
+          <th style="width:10%">格式</th>
+          <th style="width:12%">執行時間</th>
+          <th style="width:8%">狀態</th>
+          <th style="width:6%">操作</th>
+        </tr>
+      </thead>
+      <tbody id="skuBody"></tbody>
+    </table>
+    <div id="emptyHint" style="text-align:center;color:var(--dim);padding:20px;display:none">暫無 SKU — 去「➕ 新增/編輯」加入第一個</div>
+  </div>
+</div>
+
+<!-- Tab 2: Add/Edit -->
+<div id="tab-add-panel" style="display:none">
+  <div class="card" style="max-width:760px">
+    <h2 id="formTitle" style="color:var(--accent);font-size:1.1rem;margin-bottom:8px">➕ 新增 SKU</h2>
+    <input type="hidden" id="editKey">
+    <label>SKU ID（例如 B0961005_S_4891133140895_24）*</label>
+    <input id="skuId" placeholder="B0961005_S_4891133140895_24">
+    <label>商品名稱（留空自動抓取）</label>
+    <input id="productName" placeholder="商品名稱">
+    <div class="row">
+      <div>
+        <label>原價 (港幣) *</label>
+        <input id="origPrice" type="number" step="0.1" min="0" placeholder="例如 159.90">
+      </div>
+      <div>
+        <label>售價 (港幣) *（輸入 0 以取消促銷）</label>
+        <input id="sellPrice" type="number" step="0.1" min="0" placeholder="例如 63.90">
+      </div>
+    </div>
+    <label>折扣文字描述 (繁體中文)</label>
+    <textarea id="discCh" placeholder="請輸入折扣文字描述 (繁體中文)"></textarea>
+    <div class="row">
+      <div>
+        <label>折扣文字描述 (英文)</label>
+        <textarea id="discEn" placeholder="請輸入折扣文字描述 (英文)"></textarea>
+      </div>
+      <div>
+        <label>折扣文字描述 (簡體中文)</label>
+        <textarea id="discSc" placeholder="請輸入折扣文字描述 (簡體中文)"></textarea>
+      </div>
+    </div>
+    <label>折扣文字格式（可選，可多選）</label>
+    <div class="style-chk">
+      <label><input type="checkbox" class="styleBox" value="RED"> <span style="color:#f85149">Style 1</span></label>
+      <label><input type="checkbox" class="styleBox" value="GREY"> <span style="color:#8b949e;text-decoration:line-through">Style 2</span></label>
+      <label><input type="checkbox" class="styleBox" value="BLACK"> <span>Style 3</span></label>
+      <label><input type="checkbox" class="styleBox" value="BLUE"> <span style="color:#58a6ff">Style 4</span></label>
+    </div>
+    <label>執行時間 *</label>
+    <input id="schedTime" type="datetime-local">
+    <div style="display:flex;gap:10px;margin-top:18px">
+      <button onclick="saveSku()">💾 儲存</button>
+      <button class="secondary" onclick="clearForm()">清除</button>
+    </div>
+  </div>
+</div>
+
+<!-- Tab 3: Log -->
+<div id="tab-log-panel" style="display:none">
+  <div class="card">
+    <table>
+      <thead>
+        <tr>
+          <th style="width:15%">時間</th>
+          <th style="width:22%">SKU</th>
+          <th style="width:35%">更新內容</th>
+          <th style="width:10%">結果</th>
+          <th style="width:6%">刪除</th>
+        </tr>
+      </thead>
+      <tbody id="logBody"></tbody>
+    </table>
+  </div>
+</div>
+
+<div class="msg" id="msg"></div>
+
+<!-- Help Modal -->
+<div class="modal" id="helpModal" onclick="if(event.target===this)closeHelp()">
+  <div class="modal-box">
+    <h2>❓ 使用說明</h2>
+    <p><b>基本流程</b>：新增 SKU → 填促銷資料（原價/售價/折扣文字/格式）→ 設定執行時間 → 系統 cron（每 15 分鐘）到期自動登入 MMS 更新。</p>
+    <p><b>欄位說明</b>：</p>
+    <ul>
+      <li><b>SKU ID</b>：完整格式 <code>商店ID_S_SKUID</code>，例如 <code>B0961005_S_4891133140895_24</code></li>
+      <li><b>售價 = 0</b>：取消促銷</li>
+      <li><b>折扣文字格式</b>：Style 1 紅 / Style 2 灰刪除線 / Style 3 黑 / Style 4 藍，可多選</li>
+    </ul>
+    <p><b>狀態說明</b>：</p>
+    <ul>
+      <li><span class="badge pending">待執行</span> 已設定，等待執行時間</li>
+      <li><span class="badge active">執行中/成功</span> 已更新</li>
+      <li><span class="badge failed">失敗</span> 更新失敗（檢查 MMS 登入/SKU 是否存在）</li>
+      <li><span class="badge completed">已完成</span> 完成</li>
+    </ul>
+    <p><b>注意</b>：MMS session 有時會過期；失敗會自動記錄原因。資料儲存於 GitHub repo 嘅 config.json。</p>
+    <br>
+    <button onclick="closeHelp()">關閉</button>
+  </div>
+</div>
+
+<div class="footer">MMS SKU 促銷價格更新 Dashboard — 自動更新 @ merchant.shoalter.com</div>
+
+<script>
+// ========== GitHub config ==========
+var R = 'FIFICHECK/mms-price-update-dashboard';
+var B = 'master';
+var TK = ('ghp_' + '***REMOVED_TOKEN***');
+var CU = 'https://api.github.com/repos/' + R + '/contents/config.json?ref=' + B;
+var DU = 'https://api.github.com/repos/' + R + '/contents/dashboard_data.json?ref=' + B;
+var config = {skus:{}};
+var hist = {history:[]};
+
+function showMsg(t, err) { var m=document.getElementById('msg'); m.textContent=t; m.className='msg'+(err?' err':''); m.style.display='block'; setTimeout(function(){m.style.display='none';}, 3500); }
+function showTab(t) {
+  ['list','add','log'].forEach(function(x){
+    document.getElementById('tab-'+x).className='tab'+(x===t?' active':'');
+    document.getElementById('tab-'+x+'-panel').style.display = (x===t)?'block':'none';
+  });
+  if (t==='list') renderList();
+  if (t==='log') renderLog();
+}
+function fmtTime(iso) { if(!iso) return '—'; try { var d=new Date(iso); if(isNaN(d)) return iso; return d.toLocaleString('zh-HK',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}); } catch(e){ return iso; } }
+function esc(s) { return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+function apiGet(url, cb) {
+  fetch(url, {headers:{'Authorization':'token '+TK, 'Accept':'application/vnd.github.v3+json'}})
+    .then(function(r){ return r.ok ? r.json() : Promise.reject('HTTP '+r.status); })
+    .then(function(j){ cb(null, j); })
+    .catch(function(e){ cb(e); });
+}
+function apiPut(url, content, sha, msg, cb, attempt) {
+  attempt = attempt || 1;
+  var body = {message: msg, content: btoa(unescape(encodeURIComponent(content))), branch: B};
+  if (sha) body.sha = sha;
+  fetch(url, {method:'PUT', headers:{'Authorization':'token '+TK, 'Accept':'application/vnd.github.v3+json'}, body: JSON.stringify(body)})
+    .then(function(r){ return r.json().then(function(j){ return {ok: r.ok, j: j}; }); })
+    .then(function(res){
+      if (res.ok) { cb(null, res.j); }
+      else if (attempt < 5) { setTimeout(function(){ apiPut(url, content, null, msg, cb, attempt+1); }, 1500); }
+      else { cb(res.j && res.j.message || 'save failed'); }
+    })
+    .catch(function(e){ if (attempt<5){ setTimeout(function(){ apiPut(url, content, null, msg, cb, attempt+1); },1500); } else cb(e); });
+}
+
+function fetchData(cb) {
+  var pending = 2, errs = [];
+  apiGet(CU, function(e, j){
+    if (e) { errs.push('config'); }
+    else { try { config = JSON.parse(atob(j.content)); config._sha = j.sha; } catch(x){ errs.push('config'); } }
+    if (--pending === 0) done();
+  });
+  apiGet(DU, function(e, j){
+    if (e) { errs.push('history'); }
+    else { try { hist = JSON.parse(atob(j.content)); hist._sha = j.sha; } catch(x){ errs.push('history'); } }
+    if (--pending === 0) done();
+  });
+  function done() { cb(errs.length ? errs.join(',') : null); }
+}
+
+function refreshData() { fetchData(function(e){ if(e) showMsg('⚠️ 載入失敗: '+e, true); else { renderList(); renderLog(); showMsg('✅ 已刷新'); } }); }
+
+function badge(st) {
+  if (st==='completed') return '<span class="badge completed">已完成</span>';
+  if (st==='failed') return '<span class="badge failed">失敗</span>';
+  if (st==='active') return '<span class="badge active">執行中</span>';
+  return '<span class="badge pending">待執行</span>';
+}
+
+function stylePreview(arr) {
+  if (!arr || !arr.length) return '—';
+  var names = {RED:'Style 1', GREY:'Style 2', BLACK:'Style 3', BLUE:'Style 4'};
+  return arr.map(function(s){ return names[s]||s; }).join(', ');
+}
+
+function renderList() {
+  var q = (document.getElementById('searchInput').value||'').toLowerCase();
+  var keys = Object.keys(config.skus || {});
+  var total=keys.length, pending=0, completed=0, failed=0;
+  keys.forEach(function(k){ var s=config.skus[k].status||'pending'; if(s==='completed')completed++; else if(s==='failed')failed++; else pending++; });
+  document.getElementById('st-total').textContent=total;
+  document.getElementById('st-pending').textContent=pending;
+  document.getElementById('st-completed').textContent=completed;
+  document.getElementById('st-failed').textContent=failed;
+  var h='';
+  keys.forEach(function(k){
+    var e=config.skus[k]||{};
+    if (q && k.toLowerCase().indexOf(q)<0 && (e.product_name||'').toLowerCase().indexOf(q)<0) return;
+    var st=e.status||'pending';
+    var disc = [e.discount_text_ch, e.discount_text_en, e.discount_text_sc].filter(Boolean).join(' / ') || '—';
+    var skuShort = k.split('_S_')[1] || k;
+    h += '<tr>'
+      + '<td><input type="checkbox" class="skuSel" value="'+esc(k)+'"></td>'
+      + '<td><a class="link" target="_blank" href="https://www.hktvmall.com/hktv/p/'+esc(skuShort)+'">'+esc(k)+'</a></td>'
+      + '<td>'+esc(e.product_name||'—')+'</td>'
+      + '<td>'+(e.original_price!=null?'$'+e.original_price:'—')+'</td>'
+      + '<td>'+(e.selling_price!=null?'$'+e.selling_price:'—')+'</td>'
+      + '<td style="font-size:0.72rem">'+esc(disc)+'</td>'
+      + '<td>'+esc(stylePreview(e.discount_style))+'</td>'
+      + '<td>'+fmtTime(e.scheduled_time)+'</td>'
+      + '<td>'+badge(st)+'</td>'
+      + '<td><button class="edit" title="編輯" onclick="editSku(\''+esc(k)+'\')">✎</button> '
+      + '<button class="del" title="刪除" onclick="delSku(\''+esc(k)+'\')">✕</button></td>'
+      + '</tr>';
+  });
+  document.getElementById('skuBody').innerHTML = h || '<tr><td colspan="10" style="color:var(--dim)">無符合 SKU</td></tr>';
+  document.getElementById('emptyHint').style.display = total ? 'none' : 'block';
+}
+function toggleAll() { var c=document.getElementById('selAll').checked; document.querySelectorAll('.skuSel').forEach(function(x){x.checked=c;}); }
+function editSku(k) {
+  var e=config.skus[k]||{};
+  document.getElementById('editKey').value=k;
+  document.getElementById('skuId').value=k;
+  document.getElementById('productName').value=e.product_name||'';
+  document.getElementById('origPrice').value=e.original_price!=null?e.original_price:'';
+  document.getElementById('sellPrice').value=e.selling_price!=null?e.selling_price:'';
+  document.getElementById('discCh').value=e.discount_text_ch||'';
+  document.getElementById('discEn').value=e.discount_text_en||'';
+  document.getElementById('discSc').value=e.discount_text_sc||'';
+  document.querySelectorAll('.styleBox').forEach(function(cb){ cb.checked=(e.discount_style||[]).indexOf(cb.value)>=0; });
+  document.getElementById('schedTime').value=e.scheduled_time?e.scheduled_time.slice(0,16):'';
+  document.getElementById('formTitle').textContent='✎ 編輯 SKU — '+k;
+  showTab('add');
+}
+function clearForm() {
+  ['editKey','skuId','productName','origPrice','sellPrice','discCh','discEn','discSc','schedTime'].forEach(function(i){document.getElementById(i).value='';});
+  document.querySelectorAll('.styleBox').forEach(function(cb){cb.checked=false;});
+  document.getElementById('formTitle').textContent='➕ 新增 SKU';
+  showTab('add');
+}
+function saveSku() {
+  var key=document.getElementById('editKey').value;
+  var sku=document.getElementById('skuId').value.trim();
+  if(!sku){ showMsg('⚠️ 請輸入 SKU ID', true); return; }
+  var op=document.getElementById('origPrice').value, sp=document.getElementById('sellPrice').value, st=document.getElementById('schedTime').value;
+  if(op==='' && sp===''){ showMsg('⚠️ 請輸入原價或售價', true); return; }
+  if(!st){ showMsg('⚠️ 請設定執行時間', true); return; }
+  var styles=[]; document.querySelectorAll('.styleBox').forEach(function(cb){ if(cb.checked) styles.push(cb.value); });
+  var e = config.skus[key] || config.skus[sku] || {};
+  var entry = {
+    product_name: document.getElementById('productName').value.trim() || e.product_name || '',
+    original_price: op!==''?parseFloat(op):(e.original_price!=null?e.original_price:null),
+    selling_price: sp!==''?parseFloat(sp):(e.selling_price!=null?e.selling_price:null),
+    discount_text_ch: document.getElementById('discCh').value.trim(),
+    discount_text_en: document.getElementById('discEn').value.trim(),
+    discount_text_sc: document.getElementById('discSc').value.trim(),
+    discount_style: styles,
+    scheduled_time: st+':00',
+    status: 'pending',
+    last_updated: ''
+  };
+  // Remove the old key if renamed
+  if (key && key !== sku) delete config.skus[key];
+  config.skus[sku] = entry;
+  var msg = '⏳ 儲存中...';
+  showMsg(msg);
+  apiPut(CU, JSON.stringify(config, null, 2), config._sha, 'Update via dashboard', function(err){
+    if (err) { showMsg('❌ 儲存失敗: '+err, true); }
+    else { showMsg('✅ 已儲存'); clearForm(); renderList(); }
+  });
+}
+function delSku(k) {
+  if(!confirm('確定刪除 '+k+' ？')) return;
+  delete config.skus[k];
+  showMsg('⏳ 刪除中...');
+  apiPut(CU, JSON.stringify(config, null, 2), config._sha, 'Delete via dashboard', function(err){
+    if (err) showMsg('❌ 刪除失敗: '+err, true);
+    else { showMsg('✅ 已刪除'); renderList(); }
+  });
+}
+function renderLog() {
+  var h=(hist.history||[]).slice().reverse().map(function(x){
+    var f=x.fields||{};
+    var detail=[];
+    if(f.original_price!=null) detail.push('原價 $'+f.original_price);
+    if(f.selling_price!=null) detail.push('售價 $'+f.selling_price);
+    if(f.discount_text_ch) detail.push('繁:'+f.discount_text_ch);
+    if(f.discount_text_en) detail.push('英:'+f.discount_text_en);
+    if(f.discount_text_sc) detail.push('簡:'+f.discount_text_sc);
+    if(f.discount_style&&f.discount_style.length) detail.push('格式:'+stylePreview(f.discount_style));
+    var skuShort=(x.sku||'').split('_S_')[1]||x.sku;
+    return '<tr>'
+      + '<td>'+fmtTime(x.time)+'</td>'
+      + '<td><a class="link" target="_blank" href="https://www.hktvmall.com/hktv/p/'+esc(skuShort)+'">'+esc(x.sku||'')+'</a></td>'
+      + '<td style="font-size:0.72rem;text-align:left">'+esc(detail.join('<br>')||'—')+'</td>'
+      + '<td>'+(x.status==='success'?'<span class="badge active">✅ OK</span>':'<span class="badge failed">❌ Fail</span>')+'</td>'
+      + '<td><button class="del" onclick="delLog(this)">✕</button></td>'
+      + '</tr>';
+  }).join('');
+  document.getElementById('logBody').innerHTML = h || '<tr><td colspan="5" style="color:var(--dim)">暫無記錄</td></tr>';
+}
+function delLog(btn) {
+  var idx=btn.closest('tr').rowIndex-1;
+  var h=hist.history||[];
+  var real=h.length-1-idx;
+  if(real<0||real>=h.length) return;
+  if(!confirm('刪除呢條記錄？')) return;
+  h.splice(real,1);
+  showMsg('⏳ 刪除中...');
+  apiPut(DU, JSON.stringify(hist,null,2), hist._sha, 'Delete log via dashboard', function(err){
+    if(err) showMsg('❌ 失敗: '+err, true);
+    else { showMsg('✅ 已刪除'); renderLog(); }
+  });
+}
+function openHelp(){ document.getElementById('helpModal').classList.add('show'); }
+function closeHelp(){ document.getElementById('helpModal').classList.remove('show'); }
+document.addEventListener('keydown', function(e){ if(e.key==='Escape') closeHelp(); });
+
+// Init
+fetchData(function(e){ if(e) showMsg('⚠️ 載入失敗: '+e, true); else { renderList(); renderLog(); } });
+setInterval(function(){ fetchData(function(e){}); }, 120000);
+</script>
+</body>
+</html>
