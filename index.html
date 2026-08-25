@@ -105,6 +105,7 @@
           <th style="width:7%">進度</th>
           <th style="width:11%">下一動作時間</th>
           <th style="width:9%">下一價格</th>
+          <th style="width:9%">完結後售價</th>
           <th style="width:12%">下一動作</th>
           <th style="width:8%">監察時段</th>
           <th style="width:8%">狀態</th>
@@ -119,7 +120,7 @@
     <h3 style="color:var(--dim);font-size:0.9rem;margin-bottom:8px">🔵 已完成</h3>
     <div class="card">
       <table>
-        <thead><tr><th style="width:20%">SKU</th><th style="width:16%">商品名稱</th><th style="width:7%">進度</th><th style="width:11%">最後執行</th><th style="width:9%">最後售價</th><th style="width:12%">下一動作</th><th style="width:8%">監察時段</th><th style="width:8%">狀態</th><th style="width:9%">操作</th></tr></thead>
+        <thead><tr><th style="width:20%">SKU</th><th style="width:16%">商品名稱</th><th style="width:7%">進度</th><th style="width:11%">最後執行</th><th style="width:9%">最後售價</th><th style="width:9%">完結後售價</th><th style="width:12%">下一動作</th><th style="width:8%">監察時段</th><th style="width:8%">狀態</th><th style="width:9%">操作</th></tr></thead>
         <tbody id="doneBody"></tbody>
       </table>
     </div>
@@ -307,12 +308,12 @@ function renderList() {
     var phases=e.phases||[];
     var cp=e.current_phase!=null?e.current_phase:-1;
     // Next action: promo (first phase with time not promo_done) or revert (promo_done phase with end_price+end_time not reverted)
-    var nextAction=null; // {type: 'promo'|'revert', time, price, label, idx}
+    var nextAction=null; // {type: 'promo'|'revert', time, price, endPrice, label, idx}
     for (var i=cp+1;i<phases.length;i++){
       var ph=phases[i];
       if(!ph||!ph.time) continue;
-      if(!ph.promo_done){ nextAction={type:'promo', time:ph.time, price:ph.selling_price, label:phaseLabel(ph,i), idx:i}; break; }
-      if(ph.promo_done&&!ph.revert_done&&ph.end_price!=null&&ph.end_time){ nextAction={type:'revert', time:ph.end_time, price:ph.end_price, label:phaseLabel(ph,i), idx:i}; break; }
+      if(!ph.promo_done){ nextAction={type:'promo', time:ph.time, price:ph.selling_price, endPrice:ph.end_price!=null?ph.end_price:null, label:phaseLabel(ph,i), idx:i}; break; }
+      if(ph.promo_done&&!ph.revert_done&&ph.end_price!=null&&ph.end_time){ nextAction={type:'revert', time:ph.end_time, price:ph.end_price, endPrice:ph.end_price, label:phaseLabel(ph,i), idx:i}; break; }
     }
     var lastIdx = cp>=0?cp:(phases.length-1);
     var lastP = phases[lastIdx]||null;
@@ -323,18 +324,18 @@ function renderList() {
     var monWin = starts.length
       ? (fmtTime(starts[0]) + ' → ' + (ends.length ? fmtTime(ends[ends.length-1]) : fmtTime(starts[starts.length-1])))
       : '—';
-    var skuShort = k.split('_S_')[1] || k;
     var nextTime = nextAction ? nextAction.time : (st==='completed'?e.last_updated:null);
     var nextPrice = nextAction ? ('$'+nextAction.price) : (st==='completed' && lastP ? ('$'+(lastP.end_price!=null?lastP.end_price:lastP.selling_price)) : '—');
     var nextLabel = nextAction
       ? ((nextAction.type==='revert'?'🔄 還原 ':'💰 促銷 ')+esc(nextAction.label))
       : (st==='completed'?'✅ 完成':'—');
     var row = '<tr>'
-      + '<td><a class="link" target="_blank" href="https://www.hktvmall.com/hktv/p/'+esc(skuShort)+'">'+esc(k)+'</a></td>'
+      + '<td><a class="link" target="_blank" href="https://www.hktvmall.com/hktv/p/'+esc(k)+'">'+esc(k)+'</a></td>'
       + '<td>'+esc(e.product_name||'—')+'</td>'
       + '<td>'+progress+'</td>'
       + '<td>'+fmtTime(nextTime)+'</td>'
       + '<td>'+nextPrice+'</td>'
+      + '<td>'+(nextAction && nextAction.endPrice!=null ? '$'+nextAction.endPrice : (lastP && lastP.end_price!=null ? '$'+lastP.end_price : '—'))+'</td>'
       + '<td style="font-size:0.72rem">'+nextLabel+'</td>'
       + '<td style="font-size:0.7rem">'+esc(monWin)+'</td>'
       + '<td>'+badge(st)+'</td>'
@@ -343,7 +344,7 @@ function renderList() {
       + '</tr>';
     if (st==='completed') dh += row; else h += row;
   });
-  document.getElementById('skuBody').innerHTML = h || '<tr><td colspan="9" style="color:var(--dim)">無符合 SKU</td></tr>';
+  document.getElementById('skuBody').innerHTML = h || '<tr><td colspan="10" style="color:var(--dim)">無符合 SKU</td></tr>';
   document.getElementById('doneBody').innerHTML = dh;
   document.getElementById('doneSection').style.display = dh ? 'block' : 'none';
   document.getElementById('emptyHint').style.display = total ? 'none' : 'block';
@@ -502,7 +503,7 @@ function renderLog() {
       if(f.discount_text_sc) detail.push('簡:'+f.discount_text_sc);
       if(f.discount_style&&f.discount_style.length) detail.push('格式:'+stylePreview(f.discount_style));
     }
-    var skuShort=(x.sku||'').split('_S_')[1]||x.sku;
+    var skuShort=x.sku||'';
     return '<tr>'
       + '<td>'+fmtTime(x.time)+'</td>'
       + '<td><a class="link" target="_blank" href="https://www.hktvmall.com/hktv/p/'+esc(skuShort)+'">'+esc(x.sku||'')+'</a></td>'
