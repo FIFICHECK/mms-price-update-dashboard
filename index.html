@@ -106,7 +106,7 @@
           <th style="width:11%">下一階段時間</th>
           <th style="width:9%">下一售價</th>
           <th style="width:12%">階段標籤</th>
-          <th style="width:8%">監察至</th>
+          <th style="width:8%">監察時段</th>
           <th style="width:8%">狀態</th>
           <th style="width:9%">操作</th>
         </tr>
@@ -119,7 +119,7 @@
     <h3 style="color:var(--dim);font-size:0.9rem;margin-bottom:8px">🔵 已完成</h3>
     <div class="card">
       <table>
-        <thead><tr><th style="width:20%">SKU</th><th style="width:16%">商品名稱</th><th style="width:7%">進度</th><th style="width:11%">最後執行</th><th style="width:9%">最後售價</th><th style="width:12%">階段標籤</th><th style="width:8%">監察至</th><th style="width:8%">狀態</th><th style="width:9%">操作</th></tr></thead>
+        <thead><tr><th style="width:20%">SKU</th><th style="width:16%">商品名稱</th><th style="width:7%">進度</th><th style="width:11%">最後執行</th><th style="width:9%">最後售價</th><th style="width:12%">階段標籤</th><th style="width:8%">監察時段</th><th style="width:8%">狀態</th><th style="width:9%">操作</th></tr></thead>
         <tbody id="doneBody"></tbody>
       </table>
     </div>
@@ -141,8 +141,8 @@
         <input id="productName" placeholder="商品名稱">
       </div>
     </div>
-    <label>監察至（可選）— 全部階段完成後監察價格至呢個日期；留空 = 永久監察</label>
-    <input id="verifyUntil" type="date" style="max-width:220px">
+    <label>監察時段（自動）— 第一階段執行開始，最後階段時間完結</label>
+    <div id="monitorHint" style="font-size:0.78rem;color:var(--dim);margin-top:2px">加入階段後自動計算</div>
 
     <h3 style="color:var(--accent);font-size:1rem;margin-top:18px">📅 促銷階段（每個階段 = 一個時段嘅價格設定）</h3>
     <div id="phaseEditor"></div>
@@ -187,7 +187,7 @@
       <li><b>SKU ID</b>：完整格式 <code>商店ID_S_SKUID</code>，例如 <code>B0961005_S_4891133140895_24</code></li>
       <li><b>售價 = 0</b>：取消促銷</li>
       <li><b>折扣文字格式</b>：Style 1 紅 / Style 2 灰刪除線 / Style 3 黑 / Style 4 藍，可多選</li>
-      <li><b>監察至</b>：促銷期結束後停止檢查價格有冇俾人改</li>
+      <li><b>監察時段</b>：自動 = 第一階段執行開始 → 最後階段時間完結，唔使手動填</li>
     </ul>
     <p><b>狀態說明</b>：</p>
     <ul>
@@ -309,6 +309,9 @@ function renderList() {
     var lastIdx = cp>=0?cp:(phases.length-1);
     var lastP = phases[lastIdx]||null;
     var progress = phases.length ? (cp+1)+'/'+phases.length : '—';
+    // Monitor window (auto): first phase time → last phase time
+    var times = phases.map(function(p){ return p.time; }).filter(Boolean).sort();
+    var monWin = times.length ? (fmtTime(times[0]) + ' → ' + fmtTime(times[times.length-1])) : '—';
     var skuShort = k.split('_S_')[1] || k;
     var row = '<tr>'
       + '<td><a class="link" target="_blank" href="https://www.hktvmall.com/hktv/p/'+esc(skuShort)+'">'+esc(k)+'</a></td>'
@@ -317,7 +320,7 @@ function renderList() {
       + '<td>'+fmtTime(nextP?nextP.time:(st==='completed'?e.last_updated:null))+'</td>'
       + '<td>'+phasePrice(nextP||lastP)+'</td>'
       + '<td style="font-size:0.72rem">'+esc(phaseLabel(nextP,nextIdx<0?lastIdx:nextIdx))+'</td>'
-      + '<td>'+(e.verify_until?'至 '+esc(e.verify_until):'—')+'</td>'
+      + '<td style="font-size:0.7rem">'+esc(monWin)+'</td>'
       + '<td>'+badge(st)+'</td>'
       + '<td><button class="edit" title="編輯" onclick="editSku(\''+esc(k)+'\')">✎</button> '
       + '<button class="del" title="刪除" onclick="delSku(\''+esc(k)+'\')">✕</button></td>'
@@ -382,12 +385,21 @@ function renderPhases() {
       + '</div>';
   });
   box.innerHTML=h;
+  updateMonitorHint();
 }
 function toggleStyle(i, cb) {
   var arr = phaseState[i].discount_style;
   var v = cb.value;
   if (cb.checked) { if (arr.indexOf(v)<0) arr.push(v); }
   else { var ix=arr.indexOf(v); if (ix>=0) arr.splice(ix,1); }
+}
+function updateMonitorHint() {
+  var times = phaseState.map(function(p){ return p.time; }).filter(Boolean).sort();
+  var el = document.getElementById('monitorHint');
+  if (!el) return;
+  if (!times.length) { el.textContent = '加入階段後自動計算'; return; }
+  var fmt = function(t){ try { var d=new Date(t); return d.toLocaleString('zh-HK',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}); } catch(e){ return t; } };
+  el.textContent = '🕐 監察時段：' + fmt(times[0]) + ' → ' + fmt(times[times.length-1]);
 }
 
 // ========== Save / Edit ==========
@@ -396,7 +408,6 @@ function editSku(k) {
   document.getElementById('editKey').value=k;
   document.getElementById('skuId').value=k;
   document.getElementById('productName').value=e.product_name||'';
-  document.getElementById('verifyUntil').value=e.verify_until||'';
   phaseState = [];
   (e.phases||[]).forEach(function(p){ addPhase(p); });
   if (!phaseState.length) addPhase();
@@ -407,7 +418,6 @@ function clearForm() {
   document.getElementById('editKey').value='';
   document.getElementById('skuId').value='';
   document.getElementById('productName').value='';
-  document.getElementById('verifyUntil').value='';
   phaseState = [];
   addPhase();
   document.getElementById('formTitle').textContent='➕ 新增 SKU';
@@ -432,7 +442,6 @@ function saveSku() {
       discount_text_sc: (p.discount_text_sc||'').trim(),
       discount_style: p.discount_style||[]
     }; }),
-    verify_until: document.getElementById('verifyUntil').value || '',
     status: 'pending',
     current_phase: -1,
     last_updated: ''

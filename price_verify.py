@@ -148,28 +148,46 @@ def main():
         print('✅ No SKUs configured', flush=True)
         return
 
-    # Select SKUs to verify: completed (all phases done) AND (no verify_until OR verify_until >= today)
+    # Select SKUs to verify — monitoring window is automatic:
+    #   START: first phase executed (current_phase >= 0 or completed)
+    #   END:   last phase's time (past that date → stop monitoring)
+    # No manual verify_until needed.
     today = now.date().isoformat()
     targets = {}
     for sku, entry in skus.items():
-        if entry.get('status') != 'completed':
-            continue
-        vu = entry.get('verify_until')
-        if vu and vu < today:
-            continue
         phases = entry.get('phases', [])
         if not phases:
-            # Legacy single-shot format: use entry fields directly
+            # Legacy single-shot format: keep old behavior (completed + verify_until)
+            if entry.get('status') != 'completed':
+                continue
+            vu = entry.get('verify_until')
+            if vu and vu < today:
+                continue
             targets[sku] = {'entry': entry, 'phase': entry}
             continue
-        # Last executed phase = current_phase (or last phase if completed)
-        last_idx = entry.get('current_phase', len(phases) - 1)
+        # Has any phase executed yet?
+        cp = entry.get('current_phase', -1)
+        if cp < 0 and entry.get('status') != 'completed':
+            continue  # nothing executed → monitoring hasn't started
+        # Last phase time = end of monitoring window
+        last_time = None
+        for p in phases:
+            if p.get('time'):
+                last_time = p['time']
+        if last_time:
+            try:
+                if today > datetime.fromisoformat(last_time).date().isoformat():
+                    continue  # past end of window → stop monitoring
+            except Exception:
+                pass
+        # Expected prices = last executed phase
+        last_idx = cp if cp >= 0 else len(phases) - 1
         if last_idx < 0 or last_idx >= len(phases):
             last_idx = len(phases) - 1
         targets[sku] = {'entry': entry, 'phase': phases[last_idx]}
 
     if not targets:
-        print('✅ No completed SKUs to verify', flush=True)
+        print('✅ No SKUs in monitoring window', flush=True)
         return
 
     print(f'🔍 Verifying {len(targets)} SKU(s)...', flush=True)
