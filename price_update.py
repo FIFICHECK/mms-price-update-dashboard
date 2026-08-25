@@ -370,6 +370,13 @@ def main():
                 continue
             try:
                 if now >= datetime.fromisoformat(p['time']):
+                    # Skip if past its end_time (promo window already over)
+                    if p.get('end_time'):
+                        try:
+                            if now > datetime.fromisoformat(p['end_time']):
+                                continue
+                        except Exception:
+                            pass
                     next_phase = i
                     break
             except Exception:

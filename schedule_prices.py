@@ -65,6 +65,13 @@ def main():
                 continue
             try:
                 if now >= datetime.fromisoformat(st):
+                    # Skip if past its end_time (promo window already over)
+                    if p.get('end_time'):
+                        try:
+                            if now > datetime.fromisoformat(p['end_time']):
+                                continue
+                        except Exception:
+                            pass
                     due.append(sku)
                     break
             except Exception:

@@ -232,6 +232,7 @@ function apiGet(url, cb) {
     .then(function(j){ cb(null, j); })
     .catch(function(e){ cb(e); });
 }
+function b64decode(s) { return decodeURIComponent(escape(atob(s))); }
 function apiPut(url, content, sha, msg, cb, attempt) {
   attempt = attempt || 1;
   var body = {message: msg, content: btoa(unescape(encodeURIComponent(content))), branch: B};
@@ -250,12 +251,12 @@ function fetchData(cb) {
   var pending = 2, errs = [];
   apiGet(CU, function(e, j){
     if (e) { errs.push('config'); }
-    else { try { config = JSON.parse(atob(j.content)); config._sha = j.sha; } catch(x){ errs.push('config'); } }
+    else { try { config = JSON.parse(b64decode(j.content)); config._sha = j.sha; } catch(x){ errs.push('config'); } }
     if (--pending === 0) done();
   });
   apiGet(DU, function(e, j){
     if (e) { errs.push('history'); }
-    else { try { hist = JSON.parse(atob(j.content)); hist._sha = j.sha; } catch(x){ errs.push('history'); } }
+    else { try { hist = JSON.parse(b64decode(j.content)); hist._sha = j.sha; } catch(x){ errs.push('history'); } }
     if (--pending === 0) done();
   });
   function done() { cb(errs.length ? errs.join(',') : null); }
@@ -309,9 +310,12 @@ function renderList() {
     var lastIdx = cp>=0?cp:(phases.length-1);
     var lastP = phases[lastIdx]||null;
     var progress = phases.length ? (cp+1)+'/'+phases.length : '—';
-    // Monitor window (auto): first phase time → last phase time
-    var times = phases.map(function(p){ return p.time; }).filter(Boolean).sort();
-    var monWin = times.length ? (fmtTime(times[0]) + ' → ' + fmtTime(times[times.length-1])) : '—';
+    // Monitor window (auto): first phase start time → last phase end_time (or last phase time)
+    var starts = phases.map(function(p){ return p.time; }).filter(Boolean).sort();
+    var ends = phases.map(function(p){ return p.end_time; }).filter(Boolean).sort();
+    var monWin = starts.length
+      ? (fmtTime(starts[0]) + ' → ' + (ends.length ? fmtTime(ends[ends.length-1]) : fmtTime(starts[starts.length-1])))
+      : '—';
     var skuShort = k.split('_S_')[1] || k;
     var row = '<tr>'
       + '<td><a class="link" target="_blank" href="https://www.hktvmall.com/hktv/p/'+esc(skuShort)+'">'+esc(k)+'</a></td>'
@@ -334,13 +338,14 @@ function renderList() {
 }
 
 // ========== Phase Editor ==========
-var phaseState = []; // {label, time, original_price, selling_price, discount_text_ch/en/sc, discount_style[]}
+var phaseState = []; // {label, time, end_time, original_price, selling_price, discount_text_ch/en/sc, discount_style[]}
 
 function addPhase(p) {
   p = p || {};
   phaseState.push({
     label: p.label || '',
     time: p.time ? p.time.slice(0,16) : '',
+    end_time: p.end_time ? p.end_time.slice(0,16) : '',
     original_price: p.original_price!=null?p.original_price:'',
     selling_price: p.selling_price!=null?p.selling_price:'',
     discount_text_ch: p.discount_text_ch||'',
@@ -364,6 +369,7 @@ function renderPhases() {
       + '<h4>階段 '+(i+1)+' <button class="del" title="刪除此階段" onclick="removePhase('+i+')">✕</button></h4>'
       + '<div class="row">'
       +   '<div><label>執行時間 *</label><input type="datetime-local" value="'+esc(p.time)+'" oninput="phaseState['+i+'].time=this.value"></div>'
+      +   '<div><label>完結時間（可選，促銷期結束）</label><input type="datetime-local" value="'+esc(p.end_time)+'" oninput="phaseState['+i+'].end_time=this.value"></div>'
       +   '<div><label>階段標籤（可選）</label><input placeholder="例如 朝早85折 / 夜晚7折" value="'+esc(p.label)+'" oninput="phaseState['+i+'].label=this.value"></div>'
       + '</div>'
       + '<div class="row">'
@@ -394,12 +400,14 @@ function toggleStyle(i, cb) {
   else { var ix=arr.indexOf(v); if (ix>=0) arr.splice(ix,1); }
 }
 function updateMonitorHint() {
-  var times = phaseState.map(function(p){ return p.time; }).filter(Boolean).sort();
+  var starts = phaseState.map(function(p){ return p.time; }).filter(Boolean).sort();
+  var ends = phaseState.map(function(p){ return p.end_time; }).filter(Boolean).sort();
   var el = document.getElementById('monitorHint');
   if (!el) return;
-  if (!times.length) { el.textContent = '加入階段後自動計算'; return; }
+  if (!starts.length) { el.textContent = '加入階段後自動計算'; return; }
   var fmt = function(t){ try { var d=new Date(t); return d.toLocaleString('zh-HK',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}); } catch(e){ return t; } };
-  el.textContent = '🕐 監察時段：' + fmt(times[0]) + ' → ' + fmt(times[times.length-1]);
+  if (ends.length) el.textContent = '🕐 監察時段：' + fmt(starts[0]) + ' → ' + fmt(ends[ends.length-1]);
+  else el.textContent = '🕐 監察時段：' + fmt(starts[0]) + ' → 最後階段執行時間（冇填完結時間）';
 }
 
 // ========== Save / Edit ==========
@@ -435,6 +443,7 @@ function saveSku() {
     phases: validPhases.map(function(p){ return {
       label: p.label||'',
       time: p.time+':00',
+      end_time: p.end_time ? p.end_time+':00' : '',
       original_price: p.original_price!==null&&p.original_price!==''?parseFloat(p.original_price):null,
       selling_price: parseFloat(p.selling_price),
       discount_text_ch: (p.discount_text_ch||'').trim(),

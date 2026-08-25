@@ -169,14 +169,18 @@ def main():
         cp = entry.get('current_phase', -1)
         if cp < 0 and entry.get('status') != 'completed':
             continue  # nothing executed → monitoring hasn't started
-        # Last phase time = end of monitoring window
+        # Monitoring window END: last phase's end_time (preferred) or last phase's time
         last_time = None
+        last_end = None
         for p in phases:
             if p.get('time'):
                 last_time = p['time']
-        if last_time:
+            if p.get('end_time'):
+                last_end = p['end_time']
+        window_end = last_end or last_time
+        if window_end:
             try:
-                if today > datetime.fromisoformat(last_time).date().isoformat():
+                if today > datetime.fromisoformat(window_end).date().isoformat():
                     continue  # past end of window → stop monitoring
             except Exception:
                 pass
