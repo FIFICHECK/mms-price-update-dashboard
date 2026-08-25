@@ -28,8 +28,8 @@
   input, textarea, select { background: #0d1117; border: 1px solid var(--border); color: var(--text); border-radius: 6px; padding: 8px; font-size: 0.85rem; width: 100%; }
   textarea { resize: vertical; min-height: 38px; }
   label { display: block; font-size: 0.8rem; color: var(--dim); margin: 10px 0 4px; }
-  .row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-  .row3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
+  .row { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px; }
+  .row3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
   button { background: var(--accent); color: #000; border: none; border-radius: 6px; padding: 8px 16px; font-size: 0.85rem; font-weight: 600; cursor: pointer; }
   button.secondary { background: #21262d; color: var(--text); }
   button.danger { background: var(--err); color: #fff; }
@@ -128,7 +128,7 @@
 
 <!-- Tab 2: Add/Edit -->
 <div id="tab-add-panel" style="display:none">
-  <div class="card" style="max-width:860px">
+  <div class="card" style="width:100%">
     <h2 id="formTitle" style="color:var(--accent);font-size:1.1rem;margin-bottom:8px">➕ 新增 SKU</h2>
     <input type="hidden" id="editKey">
     <div class="row">
