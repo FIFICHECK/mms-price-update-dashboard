@@ -102,7 +102,8 @@
           <th style="width:8%">售價</th>
           <th style="width:18%">折扣文字</th>
           <th style="width:10%">格式</th>
-          <th style="width:12%">執行時間</th>
+          <th style="width:11%">執行時間</th>
+          <th style="width:7%">監察</th>
           <th style="width:8%">狀態</th>
           <th style="width:6%">操作</th>
         </tr>
@@ -153,6 +154,8 @@
     </div>
     <label>執行時間 *</label>
     <input id="schedTime" type="datetime-local">
+    <label>監察至（可選）— 促銷期結束日期，之後唔再 check 有冇被人改價</label>
+    <input id="verifyUntil" type="date">
     <div style="display:flex;gap:10px;margin-top:18px">
       <button onclick="saveSku()">💾 儲存</button>
       <button class="secondary" onclick="clearForm()">清除</button>
@@ -303,12 +306,13 @@ function renderList() {
       + '<td style="font-size:0.72rem">'+esc(disc)+'</td>'
       + '<td>'+esc(stylePreview(e.discount_style))+'</td>'
       + '<td>'+fmtTime(e.scheduled_time)+'</td>'
+      + '<td>'+(e.verify_until?'至 '+esc(e.verify_until):'—')+'</td>'
       + '<td>'+badge(st)+'</td>'
       + '<td><button class="edit" title="編輯" onclick="editSku(\''+esc(k)+'\')">✎</button> '
       + '<button class="del" title="刪除" onclick="delSku(\''+esc(k)+'\')">✕</button></td>'
       + '</tr>';
   });
-  document.getElementById('skuBody').innerHTML = h || '<tr><td colspan="10" style="color:var(--dim)">無符合 SKU</td></tr>';
+  document.getElementById('skuBody').innerHTML = h || '<tr><td colspan="11" style="color:var(--dim)">無符合 SKU</td></tr>';
   document.getElementById('emptyHint').style.display = total ? 'none' : 'block';
 }
 function toggleAll() { var c=document.getElementById('selAll').checked; document.querySelectorAll('.skuSel').forEach(function(x){x.checked=c;}); }
@@ -324,11 +328,12 @@ function editSku(k) {
   document.getElementById('discSc').value=e.discount_text_sc||'';
   document.querySelectorAll('.styleBox').forEach(function(cb){ cb.checked=(e.discount_style||[]).indexOf(cb.value)>=0; });
   document.getElementById('schedTime').value=e.scheduled_time?e.scheduled_time.slice(0,16):'';
+  document.getElementById('verifyUntil').value=e.verify_until||'';
   document.getElementById('formTitle').textContent='✎ 編輯 SKU — '+k;
   showTab('add');
 }
 function clearForm() {
-  ['editKey','skuId','productName','origPrice','sellPrice','discCh','discEn','discSc','schedTime'].forEach(function(i){document.getElementById(i).value='';});
+  ['editKey','skuId','productName','origPrice','sellPrice','discCh','discEn','discSc','schedTime','verifyUntil'].forEach(function(i){document.getElementById(i).value='';});
   document.querySelectorAll('.styleBox').forEach(function(cb){cb.checked=false;});
   document.getElementById('formTitle').textContent='➕ 新增 SKU';
   showTab('add');
@@ -351,6 +356,7 @@ function saveSku() {
     discount_text_sc: document.getElementById('discSc').value.trim(),
     discount_style: styles,
     scheduled_time: st+':00',
+    verify_until: document.getElementById('verifyUntil').value || '',
     status: 'pending',
     last_updated: ''
   };
