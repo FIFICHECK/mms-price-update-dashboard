@@ -1,3 +1,20 @@
 {
-  "history": []
+  "history": [
+    {
+      "sku": "B0961005_S_4891133140895_24",
+      "label": "\u671d\u65e985\u6298",
+      "fields": {
+        "original_price": 159.9,
+        "selling_price": 63.9,
+        "discount_text_ch": "\u9650\u6642\u512a\u60e0",
+        "discount_text_en": "Limited Time Offer",
+        "discount_text_sc": "\u9650\u65f6\u4f18\u60e0",
+        "discount_style": [
+          "RED"
+        ]
+      },
+      "status": "success",
+      "time": "2026-08-25T13:23:50.379923"
+    }
+  ]
 }
