@@ -117,8 +117,8 @@ class MMSPriceUpdater:
             'var f=document.querySelector("form");if(!f)return"no form";' +
             'var k=Object.keys(f).find(k=>k.startsWith("__reactFiber")||k.startsWith("__reactInternalInstance"));' +
             'if(!k)return"no react fiber";var x=f[k];while(x){' +
-            'var m=x.memoizedProps&&x.memoizedProps.onFinish;' +
-            'if(m){m.onFinish({account:args.e,password:args.p});return"ok";}x=x.return;}return"no onFinish";' +
+            'var m=x.memoizedProps;' +
+            'if(m&&m.onFinish){m.onFinish({account:args.e,password:args.p});return"ok";}x=x.return;}return"no onFinish";' +
         '}', {'e': MMS_EMAIL, 'p': MMS_PASSWORD})
         print(f'    Fiber: {result}')
         try:
@@ -266,6 +266,30 @@ class MMSPriceUpdater:
             if entry.get('discount_style') is not None:
                 self._set_discount_style(entry['discount_style'])
 
+            # Verify values were accepted (read back DOM state)
+            time.sleep(0.8)
+            verify = self.page.evaluate('() => {' +
+                'var out={};' +
+                'var op=document.getElementById("originalPrice");' +
+                'var sp=document.getElementById("sellingPrice");' +
+                'if(op) out.originalPrice=op.value;' +
+                'if(sp) out.sellingPrice=sp.value;' +
+                'var ch=document.getElementById("discountTextCh");' +
+                'if(ch) out.discountTextCh=ch.value;' +
+                'return JSON.stringify(out);' +
+            '}')
+            print(f'    Verify: {verify}')
+            try:
+                v = json.loads(verify)
+                if entry.get('original_price') is not None and v.get('originalPrice') is not None:
+                    if abs(float(v['originalPrice']) - float(entry['original_price'])) > 0.01:
+                        print(f'    ⚠️  originalPrice mismatch: {v["originalPrice"]} vs {entry["original_price"]}')
+                if entry.get('selling_price') is not None and v.get('sellingPrice') is not None:
+                    if abs(float(v['sellingPrice']) - float(entry['selling_price'])) > 0.01:
+                        print(f'    ⚠️  sellingPrice mismatch: {v["sellingPrice"]} vs {entry["selling_price"]}')
+            except Exception as e:
+                print(f'    ⚠️  verify parse: {e}')
+
             # Save — scroll to bottom and click 完 成 (or 取 消 in dry-run)
             time.sleep(1)
             btn_label = '取 消' if DRY_RUN else '完 成'
@@ -363,7 +387,7 @@ def main():
     for r in results:
         sku = r['sku']
         ok = r['success']
-        if sku in config['skus']:
+        if sku in config['skus'] and not DRY_RUN:
             if ok:
                 config['skus'][sku]['status'] = 'completed'
                 config['skus'][sku]['last_updated'] = now.isoformat()
