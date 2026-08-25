@@ -6,6 +6,7 @@
         {
           "label": "Traffic Driver to KA Project",
           "time": "2026-09-04T00:00:00",
+          "end_time": "2026-12-31T23:59:00",
           "original_price": 499,
           "selling_price": 358,
           "discount_text_ch": "限時優惠 | 原價 $499",
@@ -16,11 +17,10 @@
           ]
         }
       ],
-      "verify_until": "",
       "status": "pending",
       "current_phase": -1,
       "last_updated": ""
     }
   },
-  "_sha": "13e5a1ae3b5d7348472aa925a00541df6421dd44"
+  "_sha": "de70c5dc44a84a5fc9aef178d107390f79cc0f90"
 }
