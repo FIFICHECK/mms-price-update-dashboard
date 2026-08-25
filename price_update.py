@@ -32,6 +32,8 @@ if os.path.exists(_creds_path):
 def get_token():
     return os.environ.get('PRICE_UPDATE_TOKEN', '')
 
+DRY_RUN = os.environ.get('DRY_RUN', '') == '1'
+
 def gh_hdrs():
     return {'Authorization': f'token {get_token()}', 'Accept': 'application/vnd.github.v3+json'}
 
@@ -264,16 +266,17 @@ class MMSPriceUpdater:
             if entry.get('discount_style') is not None:
                 self._set_discount_style(entry['discount_style'])
 
-            # Save — scroll to bottom and click 完 成
+            # Save — scroll to bottom and click 完 成 (or 取 消 in dry-run)
             time.sleep(1)
-            clicked = self.page.evaluate('() => {' +
+            btn_label = '取 消' if DRY_RUN else '完 成'
+            clicked = self.page.evaluate('(args) => {' +
                 'var bs=document.querySelectorAll("button");' +
                 'for(var x of bs){' +
-                '  if(x.innerText.trim()==="完 成"){x.scrollIntoView({block:"center"});x.click();return true;}' +
+                '  if(x.innerText.trim()===args.lbl){x.scrollIntoView({block:"center"});x.click();return true;}' +
                 '}' +
                 'return false;' +
-            '}')
-            print(f'    Done btn: {clicked}')
+            '}', {'lbl': btn_label})
+            print(f'    {btn_label} btn: {clicked}')
             time.sleep(4)
             # Verify: either redirected back to product-list or success message
             url = self.page.url

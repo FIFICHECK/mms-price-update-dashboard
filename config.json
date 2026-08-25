@@ -1,3 +1,16 @@
 {
-  "skus": {}
+  "skus": {
+    "B0961005_S_4891133140895_24": {
+      "product_name": "(原箱) 屈臣氏蒸餾水 800ml x 24 支【最佳使用日期:02/2027】",
+      "original_price": 159.9,
+      "selling_price": 63.9,
+      "discount_text_ch": "限時優惠",
+      "discount_text_en": "Limited Time Offer",
+      "discount_text_sc": "限时优惠",
+      "discount_style": ["RED"],
+      "scheduled_time": "2026-08-25T12:00:00",
+      "status": "pending",
+      "last_updated": ""
+    }
+  }
 }
