@@ -89,6 +89,8 @@
     <div class="stat"><h3>執行中</h3><div class="num" style="color:#3fb950" id="st-active">0</div></div>
     <div class="stat"><h3>已完成</h3><div class="num" style="color:#8b949e" id="st-completed">0</div></div>
     <div class="stat"><h3>失敗</h3><div class="num" style="color:#f85149" id="st-failed">0</div></div>
+    <div class="stat"><h3>🔄 Next Check</h3><div class="num" style="font-size:0.95rem" id="st-nextcheck">—</div></div>
+    <div class="stat"><h3>🔄 Auto Refresh</h3><div class="num" style="font-size:0.95rem" id="st-autorefresh">—</div></div>
   </div>
   <div class="card">
     <div class="toolbar">
@@ -534,7 +536,33 @@ document.addEventListener('keydown', function(e){ if(e.key==='Escape') closeHelp
 
 // Init
 fetchData(function(e){ if(e) showMsg('⚠️ 載入失敗: '+e, true); else { renderList(); renderLog(); } });
-setInterval(function(){ fetchData(function(e){}); }, 120000);
+var AUTO_REFRESH_MS = 120000;
+var autoRefreshNextTs = Date.now() + AUTO_REFRESH_MS;
+setInterval(function(){
+  var now = Date.now();
+  // Next Check: cron scheduler runs every 15 min — show next 15-min boundary
+  var d = new Date();
+  var nextMin = Math.ceil(d.getMinutes()/15)*15;
+  var nc = new Date(d);
+  nc.setMinutes(0, 0, 0);
+  nc.setHours(nc.getHours() + Math.floor((nextMin===60?60:nextMin)/60));
+  nc.setMinutes(nextMin===60?0:nextMin);
+  if (nc <= d) nc.setTime(nc.getTime() + 15*60000);
+  var diff = Math.max(0, nc - now);
+  var mm = String(Math.floor(diff/60000)).padStart(2,'0');
+  var ss = String(Math.floor((diff%60000)/1000)).padStart(2,'0');
+  document.getElementById('st-nextcheck').textContent = mm+':'+ss;
+  document.getElementById('st-nextcheck').title = '下次 cron 檢查: '+nc.toLocaleString('zh-HK');
+  // Auto Refresh countdown
+  var rd = autoRefreshNextTs - now;
+  if (rd <= 0) { autoRefreshNextTs = now + AUTO_REFRESH_MS; rd = AUTO_REFRESH_MS; }
+  var rm = String(Math.floor(rd/60000)).padStart(2,'0');
+  var rs = String(Math.floor((rd%60000)/1000)).padStart(2,'0');
+  var el = document.getElementById('st-autorefresh');
+  el.textContent = rm+':'+rs;
+  el.title = '下次自動刷新: '+new Date(autoRefreshNextTs).toLocaleString('zh-HK');
+}, 1000);
+setInterval(function(){ autoRefreshNextTs = Date.now() + AUTO_REFRESH_MS; fetchData(function(e){}); }, AUTO_REFRESH_MS);
 </script>
 </body>
 </html>
