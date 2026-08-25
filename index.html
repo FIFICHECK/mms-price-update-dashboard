@@ -103,9 +103,9 @@
           <th style="width:20%">SKU</th>
           <th style="width:16%">商品名稱</th>
           <th style="width:7%">進度</th>
-          <th style="width:11%">下一階段時間</th>
-          <th style="width:9%">下一售價</th>
-          <th style="width:12%">階段標籤</th>
+          <th style="width:11%">下一動作時間</th>
+          <th style="width:9%">下一價格</th>
+          <th style="width:12%">下一動作</th>
           <th style="width:8%">監察時段</th>
           <th style="width:8%">狀態</th>
           <th style="width:9%">操作</th>
@@ -119,7 +119,7 @@
     <h3 style="color:var(--dim);font-size:0.9rem;margin-bottom:8px">🔵 已完成</h3>
     <div class="card">
       <table>
-        <thead><tr><th style="width:20%">SKU</th><th style="width:16%">商品名稱</th><th style="width:7%">進度</th><th style="width:11%">最後執行</th><th style="width:9%">最後售價</th><th style="width:12%">階段標籤</th><th style="width:8%">監察時段</th><th style="width:8%">狀態</th><th style="width:9%">操作</th></tr></thead>
+        <thead><tr><th style="width:20%">SKU</th><th style="width:16%">商品名稱</th><th style="width:7%">進度</th><th style="width:11%">最後執行</th><th style="width:9%">最後售價</th><th style="width:12%">下一動作</th><th style="width:8%">監察時段</th><th style="width:8%">狀態</th><th style="width:9%">操作</th></tr></thead>
         <tbody id="doneBody"></tbody>
       </table>
     </div>
@@ -182,6 +182,8 @@
     <h2>❓ 使用說明</h2>
     <p><b>基本流程</b>：新增 SKU → 加入促銷階段（每階段：執行時間 + 原價/售價 + 折扣文字 + 格式）→ 系統 cron（每 15 分鐘）到期自動登入 MMS 更新。</p>
     <p><b>多階段</b>：一個 SKU 可以有多個階段（例如 朝早 85 折 → 夜晚 7 折），各自設定時間，到期逐個執行，列表同時顯示。</p>
+    <p><b>自動還原</b>：每個階段可填「完結後售價」+「完結時間」— 到咗完結時間，系統自動將售價改返你提供嘅價（例如促銷完還原 $368）。</p>
+    <p><b>改價記錄</b>：每次執行會記錄「改前 → 改後」價格（例如 $368 → $358），喺更新記錄頁面睇到。</p>
     <p><b>欄位說明</b>：</p>
     <ul>
       <li><b>SKU ID</b>：完整格式 <code>商店ID_S_SKUID</code>，例如 <code>B0961005_S_4891133140895_24</code></li>
@@ -304,9 +306,14 @@ function renderList() {
     var st=e.status||'pending';
     var phases=e.phases||[];
     var cp=e.current_phase!=null?e.current_phase:-1;
-    // Next pending phase (after current)
-    var nextIdx=-1, nextP=null;
-    for (var i=cp+1;i<phases.length;i++){ if(phases[i]&&phases[i].time){ nextIdx=i; nextP=phases[i]; break; } }
+    // Next action: promo (first phase with time not promo_done) or revert (promo_done phase with end_price+end_time not reverted)
+    var nextAction=null; // {type: 'promo'|'revert', time, price, label, idx}
+    for (var i=cp+1;i<phases.length;i++){
+      var ph=phases[i];
+      if(!ph||!ph.time) continue;
+      if(!ph.promo_done){ nextAction={type:'promo', time:ph.time, price:ph.selling_price, label:phaseLabel(ph,i), idx:i}; break; }
+      if(ph.promo_done&&!ph.revert_done&&ph.end_price!=null&&ph.end_time){ nextAction={type:'revert', time:ph.end_time, price:ph.end_price, label:phaseLabel(ph,i), idx:i}; break; }
+    }
     var lastIdx = cp>=0?cp:(phases.length-1);
     var lastP = phases[lastIdx]||null;
     var progress = phases.length ? (cp+1)+'/'+phases.length : '—';
@@ -317,13 +324,18 @@ function renderList() {
       ? (fmtTime(starts[0]) + ' → ' + (ends.length ? fmtTime(ends[ends.length-1]) : fmtTime(starts[starts.length-1])))
       : '—';
     var skuShort = k.split('_S_')[1] || k;
+    var nextTime = nextAction ? nextAction.time : (st==='completed'?e.last_updated:null);
+    var nextPrice = nextAction ? ('$'+nextAction.price) : (st==='completed' && lastP ? ('$'+(lastP.end_price!=null?lastP.end_price:lastP.selling_price)) : '—');
+    var nextLabel = nextAction
+      ? ((nextAction.type==='revert'?'🔄 還原 ':'💰 促銷 ')+esc(nextAction.label))
+      : (st==='completed'?'✅ 完成':'—');
     var row = '<tr>'
       + '<td><a class="link" target="_blank" href="https://www.hktvmall.com/hktv/p/'+esc(skuShort)+'">'+esc(k)+'</a></td>'
       + '<td>'+esc(e.product_name||'—')+'</td>'
       + '<td>'+progress+'</td>'
-      + '<td>'+fmtTime(nextP?nextP.time:(st==='completed'?e.last_updated:null))+'</td>'
-      + '<td>'+phasePrice(nextP||lastP)+'</td>'
-      + '<td style="font-size:0.72rem">'+esc(phaseLabel(nextP,nextIdx<0?lastIdx:nextIdx))+'</td>'
+      + '<td>'+fmtTime(nextTime)+'</td>'
+      + '<td>'+nextPrice+'</td>'
+      + '<td style="font-size:0.72rem">'+nextLabel+'</td>'
       + '<td style="font-size:0.7rem">'+esc(monWin)+'</td>'
       + '<td>'+badge(st)+'</td>'
       + '<td><button class="edit" title="編輯" onclick="editSku(\''+esc(k)+'\')">✎</button> '
@@ -346,6 +358,7 @@ function addPhase(p) {
     label: p.label || '',
     time: p.time ? p.time.slice(0,16) : '',
     end_time: p.end_time ? p.end_time.slice(0,16) : '',
+    end_price: p.end_price!=null?p.end_price:'',
     original_price: p.original_price!=null?p.original_price:'',
     selling_price: p.selling_price!=null?p.selling_price:'',
     discount_text_ch: p.discount_text_ch||'',
@@ -375,6 +388,7 @@ function renderPhases() {
       + '<div class="row">'
       +   '<div><label>原價 (港幣)</label><input type="number" step="0.1" min="0" placeholder="例如 159.90" value="'+esc(p.original_price)+'" oninput="phaseState['+i+'].original_price=this.value===\'\'?null:parseFloat(this.value)"></div>'
       +   '<div><label>售價 (港幣) *（0 = 取消促銷）</label><input type="number" step="0.1" min="0" placeholder="例如 63.90" value="'+esc(p.selling_price)+'" oninput="phaseState['+i+'].selling_price=this.value===\'\'?null:parseFloat(this.value)"></div>'
+      +   '<div><label>完結後售價（可選，促銷完自動改返呢個價）</label><input type="number" step="0.1" min="0" placeholder="例如 368.00" value="'+esc(p.end_price)+'" oninput="phaseState['+i+'].end_price=this.value===\'\'?null:parseFloat(this.value)"></div>'
       + '</div>'
       + '<label>折扣文字描述 (繁體中文)</label><textarea placeholder="請輸入折扣文字描述 (繁體中文)" oninput="phaseState['+i+'].discount_text_ch=this.value">'+esc(p.discount_text_ch)+'</textarea>'
       + '<div class="row">'
@@ -444,6 +458,7 @@ function saveSku() {
       label: p.label||'',
       time: p.time+':00',
       end_time: p.end_time ? p.end_time+':00' : '',
+      end_price: p.end_price!==null&&p.end_price!==''?parseFloat(p.end_price):null,
       original_price: p.original_price!==null&&p.original_price!==''?parseFloat(p.original_price):null,
       selling_price: parseFloat(p.selling_price),
       discount_text_ch: (p.discount_text_ch||'').trim(),
@@ -476,17 +491,22 @@ function renderLog() {
   var h=(hist.history||[]).slice().reverse().map(function(x){
     var f=x.fields||{};
     var detail=[];
-    if(f.original_price!=null) detail.push('原價 $'+f.original_price);
-    if(f.selling_price!=null) detail.push('售價 $'+f.selling_price);
-    if(f.discount_text_ch) detail.push('繁:'+f.discount_text_ch);
-    if(f.discount_text_en) detail.push('英:'+f.discount_text_en);
-    if(f.discount_text_sc) detail.push('簡:'+f.discount_text_sc);
-    if(f.discount_style&&f.discount_style.length) detail.push('格式:'+stylePreview(f.discount_style));
+    var actionName = x.action==='revert' ? '🔄 還原' : '💰 促銷';
+    if(x.before_price!=null) detail.push('改前 $'+x.before_price);
+    if(x.action==='revert' && f.end_price!=null) detail.push('改後 $'+f.end_price);
+    if(x.action!=='revert'){
+      if(f.original_price!=null) detail.push('原價 $'+f.original_price);
+      if(f.selling_price!=null) detail.push('改後 $'+f.selling_price);
+      if(f.discount_text_ch) detail.push('繁:'+f.discount_text_ch);
+      if(f.discount_text_en) detail.push('英:'+f.discount_text_en);
+      if(f.discount_text_sc) detail.push('簡:'+f.discount_text_sc);
+      if(f.discount_style&&f.discount_style.length) detail.push('格式:'+stylePreview(f.discount_style));
+    }
     var skuShort=(x.sku||'').split('_S_')[1]||x.sku;
     return '<tr>'
       + '<td>'+fmtTime(x.time)+'</td>'
       + '<td><a class="link" target="_blank" href="https://www.hktvmall.com/hktv/p/'+esc(skuShort)+'">'+esc(x.sku||'')+'</a></td>'
-      + '<td>'+esc(x.label||'—')+'</td>'
+      + '<td>'+actionName+' '+(x.label?esc(x.label):'')+'</td>'
       + '<td style="font-size:0.72rem;text-align:left">'+esc(detail.join('<br>')||'—')+'</td>'
       + '<td>'+(x.status==='success'?'<span class="badge active">✅ OK</span>':'<span class="badge failed">❌ Fail</span>')+'</td>'
       + '<td><button class="del" onclick="delLog(this)">✕</button></td>'

@@ -58,20 +58,38 @@ def main():
         if not phases:
             continue
         current_phase = entry.get('current_phase', -1)
-        for i in range(current_phase + 1, len(phases)):
+        # Scan ALL phases (sequential lock: earlier phases must be fully done)
+        for i in range(len(phases)):
             p = phases[i]
             st = p.get('time')
             if not st:
                 continue
+            prev_done = True
+            for j in range(i):
+                pj = phases[j]
+                if not pj.get('time'):
+                    continue
+                pj_done = pj.get('promo_done') and (pj.get('end_price') is None or pj.get('end_time') is None or pj.get('revert_done'))
+                if not pj_done:
+                    prev_done = False
+                    break
+            if not prev_done:
+                break
             try:
-                if now >= datetime.fromisoformat(st):
-                    # Skip if past its end_time (promo window already over)
+                # PROMO due
+                if not p.get('promo_done') and now >= datetime.fromisoformat(st):
                     if p.get('end_time'):
                         try:
                             if now > datetime.fromisoformat(p['end_time']):
                                 continue
                         except Exception:
                             pass
+                    due.append(sku)
+                    break
+                # REVERT due
+                if (p.get('promo_done') and not p.get('revert_done')
+                        and p.get('end_price') is not None and p.get('end_time')
+                        and now >= datetime.fromisoformat(p['end_time'])):
                     due.append(sku)
                     break
             except Exception:

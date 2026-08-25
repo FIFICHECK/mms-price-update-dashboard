@@ -184,11 +184,17 @@ def main():
                     continue  # past end of window → stop monitoring
             except Exception:
                 pass
-        # Expected prices = last executed phase
+        # Expected prices = last executed phase (or end_price if reverted)
         last_idx = cp if cp >= 0 else len(phases) - 1
         if last_idx < 0 or last_idx >= len(phases):
             last_idx = len(phases) - 1
-        targets[sku] = {'entry': entry, 'phase': phases[last_idx]}
+        phase = phases[last_idx]
+        # If this phase was reverted (end_price set + revert_done), expected = end_price
+        if phase.get('revert_done') and phase.get('end_price') is not None:
+            targets[sku] = {'entry': entry, 'phase': {'original_price': phase.get('original_price'),
+                                                      'selling_price': phase.get('end_price')}}
+        else:
+            targets[sku] = {'entry': entry, 'phase': phase}
 
     if not targets:
         print('✅ No SKUs in monitoring window', flush=True)

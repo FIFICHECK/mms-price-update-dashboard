@@ -158,49 +158,100 @@ class MMSPriceUpdater:
         return ok
 
     def _set_discount_style(self, styles):
-        """Set discountTextStyle checkbox group. styles: list of RED/GREY/BLACK/BLUE (empty list = none)."""
+        """Set discountTextStyle checkbox group. styles: list of RED/GREY/BLACK/BLUE (empty list = none).
+        If the select is disabled by MMS (some products lock it), read current value and compare."""
         if styles is None:
             return True
-        # Open the select dropdown
-        opened = self.page.evaluate('() => {' +
+        # Check if select is disabled (MMS product-level lock)
+        disabled = self.page.evaluate('() => {' +
             'var sel=document.getElementById("discountTextStyle");if(!sel)return false;' +
-            'var wrap=sel.closest(".ant-select");if(!wrap)return false;' +
-            'var selector=wrap.querySelector(".ant-select-selector");' +
-            'var r=selector.getBoundingClientRect();' +
-            'var opts={bubbles:true,cancelable:true,view:window,clientX:r.x+r.width/2,clientY:r.y+r.height/2};' +
-            'var inp=wrap.querySelector("input");inp.focus();' +
-            'inp.dispatchEvent(new PointerEvent("pointerdown",Object.assign({pointerId:1,isPrimary:true,button:0,buttons:1,pointerType:"mouse"},opts)));' +
-            'selector.dispatchEvent(new MouseEvent("mousedown",opts));' +
-            'selector.dispatchEvent(new MouseEvent("mouseup",opts));' +
-            'selector.dispatchEvent(new MouseEvent("click",opts));' +
-            'return true;' +
+            'var wrap=sel.closest(".ant-select");' +
+            'return !!(wrap && wrap.className.includes("ant-select-disabled"));' +
         '}')
+        if disabled:
+            current = self.page.evaluate('() => {' +
+                'var sel=document.getElementById("discountTextStyle");' +
+                'var wrap=sel.closest(".ant-select");' +
+                'return wrap ? wrap.innerText.trim() : "";' +
+            '}')
+            print(f'    Style: select DISABLED (MMS lock), current="{current}" targets={styles}')
+            # Try to infer current styles from text (Discount Text Style 1 → RED etc.)
+            cur = []
+            mapping = {'1': 'RED', '2': 'GREY', '3': 'BLACK', '4': 'BLUE'}
+            for k, v in mapping.items():
+                if f'Style {k}' in current:
+                    cur.append(v)
+            # If current matches targets (or select empty and targets empty), it's fine
+            if sorted(cur) == sorted(styles or []):
+                print(f'    Style: already set correctly ({cur})')
+                return True
+            print(f'    ⚠️  Style disabled but mismatch: current={cur} target={styles} — skip (cannot change)')
+            return True  # don't fail the whole update for a locked style
+        # Open the select dropdown — scroll into view first, then REAL mouse click
+        opened = False
+        try:
+            rect = self.page.evaluate('() => {' +
+                'var sel=document.getElementById("discountTextStyle");if(!sel)return null;' +
+                'var wrap=sel.closest(".ant-select");if(!wrap)return null;' +
+                'var selector=wrap.querySelector(".ant-select-selector");' +
+                'if(selector){selector.scrollIntoView({block:"center"});}' +
+                'var r=selector.getBoundingClientRect();' +
+                'return {x:r.x+r.width/2, y:r.y+r.height/2};' +
+            '}')
+            if rect:
+                time.sleep(0.5)
+                self.page.mouse.click(rect['x'], rect['y'])
+                opened = True
+        except Exception:
+            pass
+        if not opened:
+            # Fallback: JS pointer/mouse sequence
+            opened = self.page.evaluate('() => {' +
+                'var sel=document.getElementById("discountTextStyle");if(!sel)return false;' +
+                'var wrap=sel.closest(".ant-select");if(!wrap)return false;' +
+                'var selector=wrap.querySelector(".ant-select-selector");' +
+                'var r=selector.getBoundingClientRect();' +
+                'var opts={bubbles:true,cancelable:true,view:window,clientX:r.x+r.width/2,clientY:r.y+r.height/2};' +
+                'var inp=wrap.querySelector("input");inp.focus();' +
+                'inp.dispatchEvent(new PointerEvent("pointerdown",Object.assign({pointerId:1,isPrimary:true,button:0,buttons:1,pointerType:"mouse"},opts)));' +
+                'selector.dispatchEvent(new MouseEvent("mousedown",opts));' +
+                'selector.dispatchEvent(new MouseEvent("mouseup",opts));' +
+                'selector.dispatchEvent(new MouseEvent("click",opts));' +
+                'return true;' +
+            '}')
         if not opened:
             print('    ⚠️  Style select not found')
             return False
         time.sleep(1.2)
-        # Click target checkboxes inside the dropdown
-        clicked = self.page.evaluate('(args) => {' +
+        # Click target checkboxes inside the dropdown via REAL mouse clicks
+        result = self.page.evaluate('(args) => {' +
             'var dd=document.querySelector(".ant-select-dropdown:not(.ant-select-dropdown-hidden)");' +
             'if(!dd)return "no dropdown";' +
             'var checks=dd.querySelectorAll("input.ant-checkbox-input");' +
             'var targets=args.styles;' +
+            'var clicks=[];' +
             'for(var c of checks){' +
             '  var want=targets.includes(c.value);' +
             '  if(c.checked!==want){' +
             '    var label=c.closest("label");' +
             '    if(label){' +
             '      var r=label.getBoundingClientRect();' +
-            '      var opts={bubbles:true,cancelable:true,view:window,clientX:r.x+r.width/2,clientY:r.y+r.height/2};' +
-            '      label.dispatchEvent(new MouseEvent("mousedown",opts));' +
-            '      label.dispatchEvent(new MouseEvent("mouseup",opts));' +
-            '      label.dispatchEvent(new MouseEvent("click",opts));' +
-            '      c.checked=want;' +  # optimistic set; React will confirm
+            '      clicks.push({x:r.x+r.width/2, y:r.y+r.height/2});' +
             '    }' +
             '  }' +
             '}' +
-            'return "ok";' +
+            'return clicks.length ? clicks : "ok";' +
         '}', {'styles': styles})
+        time.sleep(0.3)
+        import json as _json
+        try:
+            if isinstance(result, list) and len(result):
+                for pt in result:
+                    self.page.mouse.click(pt['x'], pt['y'])
+                    time.sleep(0.3)
+            clicked = 'ok' if (isinstance(result, list) or result == 'ok') else str(result)
+        except Exception as e:
+            clicked = f'err: {e}'
         time.sleep(0.8)
         # Close dropdown by pressing Escape
         self.page.keyboard.press('Escape')
@@ -208,9 +259,10 @@ class MMSPriceUpdater:
         print(f'    Style: {clicked} targets={styles}')
         return 'ok' in str(clicked)
 
-    def update_price(self, sku, phase, label=''):
+    def update_price(self, sku, phase, label='', action='promo'):
         sku_id = sku.split('_S_')[-1] if '_S_' in sku else sku
-        print(f'  💰 [{label}] {sku}...')
+        action_name = '🔄 還原' if action == 'revert' else '💰 促銷'
+        print(f'  {action_name} [{label}] {sku}...')
         try:
             self.page.goto('https://merchant.shoalter.com/product-management/product-list', wait_until='load', timeout=45000)
             time.sleep(3)
@@ -247,24 +299,42 @@ class MMSPriceUpdater:
             self.page.wait_for_selector('#originalPrice', timeout=20000)
             time.sleep(1)
 
-            # 1. Original price
-            if phase.get('original_price') is not None:
-                self._fill_react_input('#originalPrice', phase['original_price'])
-                time.sleep(0.5)
-            # 2. Selling price
-            if phase.get('selling_price') is not None:
-                self._fill_react_input('#sellingPrice', phase['selling_price'])
-                time.sleep(0.5)
-            # 3-5. Discount texts
-            for sel, key in [('#discountTextCh', 'discount_text_ch'),
-                             ('#discountTextEn', 'discount_text_en'),
-                             ('#discountTextSc', 'discount_text_sc')]:
-                if phase.get(key):
-                    self._fill_react_textarea(sel, phase[key])
-                    time.sleep(0.4)
-            # 6. Discount style (optional)
-            if phase.get('discount_style') is not None:
-                self._set_discount_style(phase['discount_style'])
+            # Read BEFORE price (current MMS value) for history record
+            before_price = None
+            try:
+                bp = self.page.evaluate('() => { var e=document.getElementById("sellingPrice"); return e?e.value:null; }')
+                if bp is not None and bp != '':
+                    before_price = round(float(bp), 2)
+            except Exception:
+                pass
+            print(f'    Before: sellingPrice={before_price}')
+
+            if action == 'revert':
+                # Revert action: set selling price back to end_price (restore)
+                end_price = phase.get('end_price')
+                if end_price is not None:
+                    self._fill_react_input('#sellingPrice', end_price)
+                    time.sleep(0.5)
+                # Keep original price as-is (promo revert only changes selling price)
+            else:
+                # 1. Original price
+                if phase.get('original_price') is not None:
+                    self._fill_react_input('#originalPrice', phase['original_price'])
+                    time.sleep(0.5)
+                # 2. Selling price
+                if phase.get('selling_price') is not None:
+                    self._fill_react_input('#sellingPrice', phase['selling_price'])
+                    time.sleep(0.5)
+                # 3-5. Discount texts
+                for sel, key in [('#discountTextCh', 'discount_text_ch'),
+                                 ('#discountTextEn', 'discount_text_en'),
+                                 ('#discountTextSc', 'discount_text_sc')]:
+                    if phase.get(key):
+                        self._fill_react_textarea(sel, phase[key])
+                        time.sleep(0.4)
+                # 6. Discount style (optional)
+                if phase.get('discount_style') is not None:
+                    self._set_discount_style(phase['discount_style'])
 
             # Verify values were accepted (read back DOM state)
             time.sleep(0.8)
@@ -281,12 +351,17 @@ class MMSPriceUpdater:
             print(f'    Verify: {verify}')
             try:
                 v = json.loads(verify)
-                if phase.get('original_price') is not None and v.get('originalPrice') is not None:
-                    if abs(float(v['originalPrice']) - float(phase['original_price'])) > 0.01:
-                        print(f'    ⚠️  originalPrice mismatch: {v["originalPrice"]} vs {phase["original_price"]}')
-                if phase.get('selling_price') is not None and v.get('sellingPrice') is not None:
-                    if abs(float(v['sellingPrice']) - float(phase['selling_price'])) > 0.01:
-                        print(f'    ⚠️  sellingPrice mismatch: {v["sellingPrice"]} vs {phase["selling_price"]}')
+                if action == 'revert':
+                    if phase.get('end_price') is not None and v.get('sellingPrice') is not None:
+                        if abs(float(v['sellingPrice']) - float(phase['end_price'])) > 0.01:
+                            print(f'    ⚠️  sellingPrice mismatch (revert): {v["sellingPrice"]} vs {phase["end_price"]}')
+                else:
+                    if phase.get('original_price') is not None and v.get('originalPrice') is not None:
+                        if abs(float(v['originalPrice']) - float(phase['original_price'])) > 0.01:
+                            print(f'    ⚠️  originalPrice mismatch: {v["originalPrice"]} vs {phase["original_price"]}')
+                    if phase.get('selling_price') is not None and v.get('sellingPrice') is not None:
+                        if abs(float(v['sellingPrice']) - float(phase['selling_price'])) > 0.01:
+                            print(f'    ⚠️  sellingPrice mismatch: {v["sellingPrice"]} vs {phase["selling_price"]}')
             except Exception as e:
                 print(f'    ⚠️  verify parse: {e}')
 
@@ -305,10 +380,10 @@ class MMSPriceUpdater:
             # Verify: either redirected back to product-list or success message
             url = self.page.url
             print(f'    After URL: {url}')
-            return True
+            return True, before_price
         except Exception as e:
             print(f'    ❌ {e}')
-            return False
+            return False, None
 
     def run(self, actions):
         if not actions:
@@ -317,10 +392,14 @@ class MMSPriceUpdater:
         results = []
         try:
             self.login()
-            for sku, phase, label in actions:
-                ok = self.update_price(sku, phase, label)
-                results.append({'sku': sku, 'label': label, 'success': ok,
-                                'fields': {k: v for k, v in phase.items() if k not in ('time', 'label')}})
+            for sku, phase, label, action in actions:
+                ok, before_price = self.update_price(sku, phase, label, action)
+                fields = {k: v for k, v in phase.items() if k not in ('time', 'end_time', 'label', 'end_price')}
+                if action == 'revert':
+                    fields = {'end_price': phase.get('end_price')}
+                results.append({'sku': sku, 'label': label, 'action': action,
+                                'success': ok, 'before_price': before_price,
+                                'fields': fields})
                 time.sleep(2)
         finally:
             self.stop()
@@ -363,47 +442,88 @@ def main():
             print(f'  ⏳ {sku}: no phases')
             continue
         current_phase = entry.get('current_phase', -1)
-        next_phase = -1
-        for i in range(current_phase + 1, len(phases)):
+        # Scan ALL phases for due actions (promo at time, revert at end_time)
+        # — revert can be due on the current_phase itself (promo_done but not reverted).
+        #   Sequential lock: only consider phase i when all earlier phases are fully done.
+        for i in range(len(phases)):
             p = phases[i]
             if not p.get('time'):
                 continue
+            # Sequential lock: earlier phases must be fully complete
+            prev_done = True
+            for j in range(i):
+                pj = phases[j]
+                if not pj.get('time'):
+                    continue
+                pj_done = pj.get('promo_done') and (pj.get('end_price') is None or pj.get('end_time') is None or pj.get('revert_done'))
+                if not pj_done:
+                    prev_done = False
+                    break
+            if not prev_done:
+                break  # earlier phase not finished — must wait
             try:
-                if now >= datetime.fromisoformat(p['time']):
-                    # Skip if past its end_time (promo window already over)
+                # PROMO action: due when now >= time (and within end window if end_time set)
+                if not p.get('promo_done') and now >= datetime.fromisoformat(p['time']):
                     if p.get('end_time'):
                         try:
                             if now > datetime.fromisoformat(p['end_time']):
-                                continue
+                                continue  # window already over, skip promo
                         except Exception:
                             pass
-                    next_phase = i
+                    print(f'  🟢 {sku}: Phase {i+1} PROMO [{p.get("label","")}] ({p.get("time","")})')
+                    actions.append((sku, p, p.get('label', f'Phase {i+1}'), 'promo'))
+                    config['skus'][sku]['_next_phase'] = i
+                    config['skus'][sku]['_next_action'] = 'promo'
+                    break
+                # REVERT action: due when now >= end_time and promo already done
+                if (p.get('promo_done') and not p.get('revert_done')
+                        and p.get('end_price') is not None and p.get('end_time')
+                        and now >= datetime.fromisoformat(p['end_time'])):
+                    print(f'  🔄 {sku}: Phase {i+1} REVERT [{p.get("label","")}] → ${p.get("end_price")}')
+                    actions.append((sku, p, p.get('label', f'Phase {i+1}'), 'revert'))
+                    config['skus'][sku]['_next_phase'] = i
+                    config['skus'][sku]['_next_action'] = 'revert'
                     break
             except Exception:
                 pass
-        if next_phase >= 0:
-            p = phases[next_phase]
-            print(f'  🟢 {sku}: Phase {next_phase+1} [{p.get("label","")}] ({p.get("time","")})')
-            actions.append((sku, p, p.get('label', f'Phase {next_phase+1}')))
-            config['skus'][sku]['_next_phase'] = next_phase
         else:
-            for i in range(current_phase + 1, len(phases)):
+            # No action due — report next pending time (with same sequential lock)
+            for i in range(len(phases)):
                 p = phases[i]
-                if p.get('time'):
-                    try:
+                if not p.get('time'):
+                    continue
+                prev_done = True
+                for j in range(i):
+                    pj = phases[j]
+                    if not pj.get('time'):
+                        continue
+                    pj_done = pj.get('promo_done') and (pj.get('end_price') is None or pj.get('end_time') is None or pj.get('revert_done'))
+                    if not pj_done:
+                        prev_done = False
+                        break
+                if not prev_done:
+                    break
+                try:
+                    if not p.get('promo_done') and p.get('time'):
                         pt = datetime.fromisoformat(p['time'])
                         if pt > now:
                             mins = int((pt - now).total_seconds() / 60)
                             print(f'  ⏳ {sku}: Phase {i+1} in {mins} min [{p.get("label","")}]')
                             break
-                    except Exception:
-                        pass
+                    if p.get('promo_done') and not p.get('revert_done') and p.get('end_time'):
+                        pt = datetime.fromisoformat(p['end_time'])
+                        if pt > now:
+                            mins = int((pt - now).total_seconds() / 60)
+                            print(f'  ⏳ {sku}: Phase {i+1} revert in {mins} min')
+                            break
+                except Exception:
+                    pass
 
     if not actions:
         print('✅ No actions needed')
         return
 
-    print(f'\n📦 {len(actions)} phase(s) to update')
+    print(f'\n📦 {len(actions)} action(s) to update')
     updater = MMSPriceUpdater()
     results = updater.run(actions)
 
@@ -411,16 +531,29 @@ def main():
         sku = r['sku']
         ok = r['success']
         if sku in config['skus'] and not DRY_RUN:
-            if ok:
-                np = config['skus'][sku].pop('_next_phase', -1)
-                config['skus'][sku]['current_phase'] = np
-                config['skus'][sku]['last_updated'] = now.isoformat()
-                if np >= len(config['skus'][sku].get('phases', [])) - 1:
-                    config['skus'][sku]['status'] = 'completed'
+            np = config['skus'][sku].pop('_next_phase', -1)
+            na = config['skus'][sku].pop('_next_action', 'promo')
+            phases = config['skus'][sku].get('phases', [])
+            if 0 <= np < len(phases):
+                if ok:
+                    if na == 'revert':
+                        phases[np]['revert_done'] = True
+                    else:
+                        phases[np]['promo_done'] = True
+                    # advance current_phase to the furthest promo_done phase
+                    furthest = -1
+                    for j, ph in enumerate(phases):
+                        if ph.get('promo_done') or ph.get('revert_done'):
+                            furthest = j
+                    config['skus'][sku]['current_phase'] = furthest
+                    config['skus'][sku]['last_updated'] = now.isoformat()
+                    # completed when ALL phases fully done
+                    all_done = all(
+                        (ph.get('promo_done') and (ph.get('end_price') is None or ph.get('end_time') is None or ph.get('revert_done')))
+                        for ph in phases if ph.get('time'))
+                    config['skus'][sku]['status'] = 'completed' if all_done else 'active'
                 else:
-                    config['skus'][sku]['status'] = 'active'
-            else:
-                config['skus'][sku]['status'] = 'failed'
+                    config['skus'][sku]['status'] = 'failed'
 
     dashboard = get_dashboard_data()
     if 'history' not in dashboard:
@@ -429,11 +562,17 @@ def main():
         dashboard['history'].append({
             'sku': r['sku'],
             'label': r.get('label', ''),
+            'action': r.get('action', 'promo'),
+            'before_price': r.get('before_price'),
             'fields': r.get('fields', {}),
             'status': 'success' if r['success'] else 'failed',
             'time': now.isoformat()
         })
     dashboard['history'] = dashboard['history'][-500:]
+
+    if DRY_RUN:
+        print('🧪 DRY_RUN — 唔 save config/history（保持原狀）')
+        return
 
     # Save with fresh SHA
     config.pop('_sha', None)
