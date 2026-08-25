@@ -4,31 +4,13 @@
       "sku": "B0961005_S_4894436008671",
       "label": "Traffic Driver to KA Project",
       "action": "promo",
-      "before_price": 368.0,
+      "before_price": 368,
       "fields": {
         "original_price": 499,
         "selling_price": 358,
-        "discount_text_ch": "\u9650\u6642\u512a\u60e0 | \u539f\u50f9 99",
+        "discount_text_ch": "限時優惠 | 原價 99",
         "discount_text_en": "Special Offer | RSP499",
-        "discount_text_sc": "\u9650\u6642\u512a\u60e0 | \u539f\u50f9 99",
-        "discount_style": [
-          "RED"
-        ]
-      },
-      "status": "success",
-      "time": "2026-08-25T14:59:35.387974"
-    },
-    {
-      "sku": "B0961005_S_4894436008671",
-      "label": "Traffic Driver to KA Project",
-      "action": "promo",
-      "before_price": 368.0,
-      "fields": {
-        "original_price": 499,
-        "selling_price": 358,
-        "discount_text_ch": "\u9650\u6642\u512a\u60e0 | \u539f\u50f9 99",
-        "discount_text_en": "Special Offer | RSP499",
-        "discount_text_sc": "\u9650\u6642\u512a\u60e0 | \u539f\u50f9 99",
+        "discount_text_sc": "限時優惠 | 原價 99",
         "discount_style": [
           "RED"
         ]
@@ -40,13 +22,13 @@
       "sku": "B0961005_S_4894436008671",
       "label": "Traffic Driver to KA Project",
       "action": "promo",
-      "before_price": 368.0,
+      "before_price": 368,
       "fields": {
         "original_price": 499,
         "selling_price": 358,
-        "discount_text_ch": "\u9650\u6642\u512a\u60e0 | \u539f\u50f9 99",
+        "discount_text_ch": "限時優惠 | 原價 99",
         "discount_text_en": "Special Offer | RSP499",
-        "discount_text_sc": "\u9650\u6642\u512a\u60e0 | \u539f\u50f9 99",
+        "discount_text_sc": "限時優惠 | 原價 99",
         "discount_style": [
           "RED"
         ]
@@ -54,5 +36,6 @@
       "status": "success",
       "time": "2026-08-25T15:15:10.973102"
     }
-  ]
+  ],
+  "_sha": "ad46c5c0f9803a38a860413d60a50eddd4202fbc"
 }
