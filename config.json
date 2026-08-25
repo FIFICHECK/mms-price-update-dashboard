@@ -1,3 +1,37 @@
 {
-  "skus": {}
+  "skus": {
+    "B0961005_S_4891133140895_24": {
+      "product_name": "(\u539f\u7bb1) \u5c48\u81e3\u6c0f\u84b8\u993e\u6c34 800ml x 24 \u652f\u3010\u6700\u4f73\u4f7f\u7528\u65e5\u671f:02/2027\u3011",
+      "status": "pending",
+      "current_phase": -1,
+      "verify_until": "2026-12-31",
+      "phases": [
+        {
+          "label": "\u671d\u65e985\u6298",
+          "time": "2026-08-25T13:18:30.152722",
+          "original_price": 159.9,
+          "selling_price": 63.9,
+          "discount_text_ch": "\u9650\u6642\u512a\u60e0",
+          "discount_text_en": "Limited Time Offer",
+          "discount_text_sc": "\u9650\u65f6\u4f18\u60e0",
+          "discount_style": [
+            "RED"
+          ]
+        },
+        {
+          "label": "\u591c\u665a7\u6298",
+          "time": "2026-08-25T15:23:30.152722",
+          "original_price": 159.9,
+          "selling_price": 111.9,
+          "discount_text_ch": "\u591c\u665a7\u6298",
+          "discount_text_en": "Night 30% off",
+          "discount_text_sc": "\u591c\u95f47\u6298",
+          "discount_style": [
+            "BLUE"
+          ]
+        }
+      ],
+      "last_updated": ""
+    }
+  }
 }
