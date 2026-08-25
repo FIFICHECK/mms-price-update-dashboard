@@ -1,3 +1,26 @@
 {
-  "skus": {}
+  "skus": {
+    "B0961005_S_4894436008671": {
+      "product_name": "",
+      "phases": [
+        {
+          "label": "Traffic Driver to KA Project",
+          "time": "2026-09-04T00:00:00",
+          "original_price": 499,
+          "selling_price": 358,
+          "discount_text_ch": "限時優惠 | 原價 $499",
+          "discount_text_en": "Special Offer | RSP499",
+          "discount_text_sc": "限時優惠 | 原價 $499",
+          "discount_style": [
+            "RED"
+          ]
+        }
+      ],
+      "verify_until": "",
+      "status": "pending",
+      "current_phase": -1,
+      "last_updated": ""
+    }
+  },
+  "_sha": "13e5a1ae3b5d7348472aa925a00541df6421dd44"
 }
