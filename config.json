@@ -15,13 +15,13 @@
           "discount_style": [
             "RED"
           ],
-          "end_price": 368.0
+          "end_price": 368.0,
+          "promo_done": true
         }
       ],
-      "status": "pending",
-      "current_phase": -1,
-      "last_updated": ""
+      "status": "active",
+      "current_phase": 0,
+      "last_updated": "2026-08-28T00:00:06.976922"
     }
-  },
-  "_sha": "0e00ee72c8d80f23588c7bcee76a0d276d15abbf"
+  }
 }
