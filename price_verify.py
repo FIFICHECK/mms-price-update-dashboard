@@ -12,7 +12,7 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 GITHUB_REPO = 'FIFICHECK/mms-price-update-dashboard'
 GITHUB_BRANCH = 'master'
 MMS_EMAIL = '***REMOVED_EMAIL***'
-MMS_PASSWORD = '***REMOVED_PASSWORD***!!!'
+MMS_PASSWORD = '***REMOVED_PASSWORD***'
 STORE_ID = 'B0961005'
 
 _creds_path = os.path.join(BASE_DIR, 'mms_creds.json')
