@@ -1,4 +1,22 @@
 {
-  "history": [],
-  "_sha": "5347afb5a457b0dbfb3a3f6474daffd6eebb5c19"
+  "history": [
+    {
+      "sku": "B0961005_S_4894436008671",
+      "label": "Traffic Driver to KA Project",
+      "action": "promo",
+      "before_price": 368.0,
+      "fields": {
+        "original_price": 499,
+        "selling_price": 358,
+        "discount_text_ch": "\u9650\u6642\u512a\u60e0 | \u539f\u50f9499",
+        "discount_text_en": "Special Offer | RSP499",
+        "discount_text_sc": "\u9650\u6642\u512a\u60e0 | \u539f\u50f9499",
+        "discount_style": [
+          "RED"
+        ]
+      },
+      "status": "success",
+      "time": "2026-08-28T00:00:06.976922"
+    }
+  ]
 }
