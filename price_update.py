@@ -10,8 +10,8 @@ from playwright.sync_api import sync_playwright
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 GITHUB_REPO = 'FIFICHECK/mms-price-update-dashboard'
 GITHUB_BRANCH = 'master'
-MMS_EMAIL = '***REMOVED_EMAIL***'
-MMS_PASSWORD = '***REMOVED_PASSWORD***'
+MMS_EMAIL = os.environ.get('MMS_EMAIL', '')
+MMS_PASSWORD = os.environ.get('MMS_PASSWORD', '')
 STORE_ID = 'B0961005'
 
 # Local creds override (gitignored mms_creds.json) — supports personal instances
@@ -29,6 +29,9 @@ if os.path.exists(_creds_path):
     except Exception as e:
         print(f'⚠️  mms_creds.json read failed: {e}')
 
+
+if not MMS_EMAIL or not MMS_PASSWORD:
+    sys.exit("❌ MMS credentials not configured — set MMS_EMAIL/MMS_PASSWORD env or local mms_creds.json")
 def get_token():
     return os.environ.get('PRICE_UPDATE_TOKEN', '')
 
