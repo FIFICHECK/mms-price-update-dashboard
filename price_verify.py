@@ -168,6 +168,9 @@ def main():
                 continue
             targets[sku] = {'entry': entry, 'phase': entry}
             continue
+        # Skip SKUs marked as price-locked by promotional contract (edit page shows locked price, real display differs)
+        if entry.get('verify_skip'):
+            continue
         # Has any phase executed yet?
         cp = entry.get('current_phase', -1)
         if cp < 0 and entry.get('status') != 'completed':
@@ -248,10 +251,9 @@ def main():
     print('⚠️  **MMS 價格變更偵測**', flush=True)
     print(f'📅 檢查時間: {now.strftime("%Y-%m-%d %H:%M")}', flush=True)
     print('', flush=True)
-    for sku, tinfo in drifts:
-        entry = tinfo[1]['entry']
-        phase = tinfo[1]['phase']
-        changed = tinfo[2]
+    for sku, meta, changed in drifts:
+        entry = meta['entry']
+        phase = meta['phase']
         name = entry.get('product_name', '')
         print(f'**{sku}**', flush=True)
         if name:
