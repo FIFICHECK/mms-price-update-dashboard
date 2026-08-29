@@ -79,6 +79,7 @@
   <button class="tab active" onclick="showTab('list')" id="tab-list">📋 SKU 列表</button>
   <button class="tab" onclick="showTab('add')" id="tab-add">➕ 新增/編輯</button>
   <button class="tab" onclick="showTab('log')" id="tab-log">📝 更新記錄</button>
+  <button class="tab" style="margin-left:auto" onclick="openToken()" id="tab-token">🔑 Token</button>
 </div>
 
 <!-- Tab 1: SKU List -->
@@ -220,15 +221,58 @@
 
 <div class="footer">MMS SKU 促銷價格更新 Dashboard — 自動更新 @ merchant.shoalter.com</div>
 
+<!-- Token Modal -->
+<div class="modal" id="tokenModal" onclick="if(event.target===this)closeToken()">
+  <div class="modal-box">
+    <h2>🔑 GitHub Token 設定</h2>
+    <p style="color:var(--dim);font-size:0.85rem">寫入（新增/編輯/刪除 SKU）需要 GitHub Token。Token 只存喺你瀏覽器（localStorage），唔會上傳或 commit 出街。讀取唔需要 Token。</p>
+    <p style="color:var(--dim);font-size:0.85rem">Token 需要 <code>repo</code> scope。建立：GitHub → Settings → Developer settings → Personal access tokens → Fine-grained tokens（選 <code>FIFICHECK/mms-price-update-dashboard</code> repo + Contents read/write）</p>
+    <input type="password" id="tokenInput" placeholder="ghp_... 或 github_pat_..." style="width:100%;padding:8px;margin:8px 0;border:1px solid var(--border);border-radius:6px;background:var(--bg2);color:var(--fg)">
+    <div style="display:flex;gap:8px">
+      <button onclick="saveToken()">💾 儲存</button>
+      <button class="secondary" onclick="closeToken()">取消</button>
+    </div>
+    <p id="tokenStatus" style="font-size:0.8rem;margin-top:8px"></p>
+  </div>
+</div>
+
 <script>
 // ========== GitHub config ==========
 var R = 'FIFICHECK/mms-price-update-dashboard';
 var B = 'master';
-var TK = ('ghp_' + '***REMOVED_TOKEN***');
-var CU = 'https://api.github.com/repos/' + R + '/contents/config.json?ref=' + B;
-var DU = 'https://api.github.com/repos/' + R + '/contents/dashboard_data.json?ref=' + B;
+var RAW = 'https://raw.githubusercontent.com/' + R + '/' + B + '/';
+var CU = RAW + 'config.json';
+var DU = RAW + 'dashboard_data.json';
+var API = 'https://api.github.com/repos/' + R + '/contents/';
 var config = {skus:{}};
 var hist = {history:[]};
+
+// Write token stored in localStorage (user pastes once; never committed to repo)
+function getTK() { return localStorage.getItem('mms_gh_token') || ''; }
+function setTK(t) { localStorage.setItem('mms_gh_token', t); }
+function openToken() {
+  document.getElementById('tokenInput').value = getTK();
+  document.getElementById('tokenStatus').textContent = '';
+  document.getElementById('tokenModal').style.display = 'flex';
+}
+function closeToken() { document.getElementById('tokenModal').style.display = 'none'; }
+function saveToken() {
+  var t = document.getElementById('tokenInput').value.trim();
+  if (!t) { setTK(''); document.getElementById('tokenStatus').textContent = '已清除 Token'; return; }
+  // Validate by hitting GitHub API
+  fetch('https://api.github.com/user', {headers:{'Authorization':'token '+t}})
+    .then(function(r){ return r.json(); })
+    .then(function(j){
+      if (j && j.login) {
+        setTK(t);
+        document.getElementById('tokenStatus').textContent = '✅ 已儲存（' + j.login + '）';
+        setTimeout(closeToken, 800);
+      } else {
+        document.getElementById('tokenStatus').textContent = '❌ Token 無效（' + (j.message||'?') + '）';
+      }
+    })
+    .catch(function(e){ document.getElementById('tokenStatus').textContent = '❌ 驗證失敗: '+e; });
+}
 
 function showMsg(t, err) { var m=document.getElementById('msg'); m.textContent=t; m.className='msg'+(err?' err':''); m.style.display='block'; setTimeout(function(){m.style.display='none';}, 3500); }
 function showTab(t) {
@@ -243,38 +287,45 @@ function fmtTime(iso) { if(!iso) return '—'; try { var d=new Date(iso); if(isN
 function esc(s) { return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 
 function apiGet(url, cb) {
-  fetch(url, {headers:{'Authorization':'token '+TK, 'Accept':'application/vnd.github.v3+json'}})
+  fetch(url, {credentials:'include', headers:{'Accept':'application/vnd.github.v3+json'}})
     .then(function(r){ return r.ok ? r.json() : Promise.reject('HTTP '+r.status); })
     .then(function(j){ cb(null, j); })
     .catch(function(e){ cb(e); });
 }
 function b64decode(s) { return decodeURIComponent(escape(atob(s))); }
-function apiPut(url, content, sha, msg, cb, attempt) {
+function apiPut(file, content, sha, msg, cb, attempt) {
   attempt = attempt || 1;
+  var tk = getTK();
+  if (!tk) { cb('未設定 Token — 撳右上「🔑 Token」輸入'); return; }
+  var url = API + file + '?ref=' + B;
   var body = {message: msg, content: btoa(unescape(encodeURIComponent(content))), branch: B};
   if (sha) body.sha = sha;
-  fetch(url, {method:'PUT', headers:{'Authorization':'token '+TK, 'Accept':'application/vnd.github.v3+json'}, body: JSON.stringify(body)})
+  fetch(url, {method:'PUT', headers:{'Authorization':'token '+tk, 'Accept':'application/vnd.github.v3+json'}, body: JSON.stringify(body)})
     .then(function(r){ return r.json().then(function(j){ return {ok: r.ok, j: j}; }); })
     .then(function(res){
       if (res.ok) { cb(null, res.j); }
-      else if (attempt < 5) { setTimeout(function(){ apiPut(url, content, null, msg, cb, attempt+1); }, 1500); }
+      else if (attempt < 5) { setTimeout(function(){ apiPut(file, content, null, msg, cb, attempt+1); }, 1500); }
       else { cb(res.j && res.j.message || 'save failed'); }
     })
-    .catch(function(e){ if (attempt<5){ setTimeout(function(){ apiPut(url, content, null, msg, cb, attempt+1); },1500); } else cb(e); });
+    .catch(function(e){ if (attempt<5){ setTimeout(function(){ apiPut(file, content, null, msg, cb, attempt+1); },1500); } else cb(e); });
 }
 
 function fetchData(cb) {
   var pending = 2, errs = [];
-  apiGet(CU, function(e, j){
-    if (e) { errs.push('config'); }
-    else { try { config = JSON.parse(b64decode(j.content)); config._sha = j.sha; } catch(x){ errs.push('config'); } }
-    if (--pending === 0) done();
-  });
-  apiGet(DU, function(e, j){
-    if (e) { errs.push('history'); }
-    else { try { hist = JSON.parse(b64decode(j.content)); hist._sha = j.sha; } catch(x){ errs.push('history'); } }
-    if (--pending === 0) done();
-  });
+  fetch(CU, {cache:'no-store'})
+    .then(function(r){ return r.ok ? r.text() : Promise.reject('HTTP '+r.status); })
+    .then(function(t){ config = JSON.parse(t); return fetch(API+'config.json?ref='+B); })
+    .then(function(r){ return r.ok ? r.json() : null; })
+    .then(function(j){ if (j) config._sha = j.sha; })
+    .catch(function(e){ errs.push('config'); })
+    .then(function(){ if (--pending === 0) done(); });
+  fetch(DU, {cache:'no-store'})
+    .then(function(r){ return r.ok ? r.text() : Promise.reject('HTTP '+r.status); })
+    .then(function(t){ hist = JSON.parse(t); return fetch(API+'dashboard_data.json?ref='+B); })
+    .then(function(r){ return r.ok ? r.json() : null; })
+    .then(function(j){ if (j) hist._sha = j.sha; })
+    .catch(function(e){ errs.push('history'); })
+    .then(function(){ if (--pending === 0) done(); });
   function done() { cb(errs.length ? errs.join(',') : null); }
 }
 
@@ -487,7 +538,7 @@ function saveSku() {
   if (key && key !== sku) delete config.skus[key];
   config.skus[sku] = entry;
   showMsg('⏳ 儲存中...');
-  apiPut(CU, JSON.stringify(config, null, 2), config._sha, 'Update via dashboard', function(err){
+  apiPut('config.json', JSON.stringify(config, null, 2), config._sha, 'Update via dashboard', function(err){
     if (err) { showMsg('❌ 儲存失敗: '+err, true); }
     else { showMsg('✅ 已儲存'); clearForm(); renderList(); }
   });
@@ -496,7 +547,7 @@ function delSku(k) {
   if(!confirm('確定刪除 '+k+' ？')) return;
   delete config.skus[k];
   showMsg('⏳ 刪除中...');
-  apiPut(CU, JSON.stringify(config, null, 2), config._sha, 'Delete via dashboard', function(err){
+  apiPut('config.json', JSON.stringify(config, null, 2), config._sha, 'Delete via dashboard', function(err){
     if (err) showMsg('❌ 刪除失敗: '+err, true);
     else { showMsg('✅ 已刪除'); renderList(); }
   });
@@ -536,7 +587,7 @@ function delLog(btn) {
   if(!confirm('刪除呢條記錄？')) return;
   h.splice(real,1);
   showMsg('⏳ 刪除中...');
-  apiPut(DU, JSON.stringify(hist,null,2), hist._sha, 'Delete log via dashboard', function(err){
+  apiPut('dashboard_data.json', JSON.stringify(hist,null,2), hist._sha, 'Delete log via dashboard', function(err){
     if(err) showMsg('❌ 失敗: '+err, true);
     else { showMsg('✅ 已刪除'); renderLog(); }
   });
