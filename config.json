@@ -1,27 +1,27 @@
 {
   "skus": {
     "B0961005_S_4894436008671": {
-      "product_name": "G-NiiB Immunity+ \u76ca\u751f\u83cc 28\u5305",
+      "product_name": "G-NiiB Immunity+ 益生菌 28包",
       "phases": [
         {
           "label": "Traffic Driver to KA Project",
           "time": "2026-08-28T00:00:00",
           "end_time": "2026-12-31T23:59:00",
+          "end_price": 368,
           "original_price": 499,
           "selling_price": 358,
-          "discount_text_ch": "\u9650\u6642\u512a\u60e0 | \u539f\u50f9499",
+          "discount_text_ch": "限時優惠 | 原價499",
           "discount_text_en": "Special Offer | RSP499",
-          "discount_text_sc": "\u9650\u6642\u512a\u60e0 | \u539f\u50f9499",
+          "discount_text_sc": "限時優惠 | 原價499",
           "discount_style": [
             "RED"
-          ],
-          "end_price": 368.0,
-          "promo_done": true
+          ]
         }
       ],
-      "status": "active",
-      "current_phase": 0,
-      "last_updated": "2026-08-28T00:00:06.976922"
+      "status": "pending",
+      "current_phase": -1,
+      "last_updated": ""
     }
-  }
+  },
+  "_sha": "5e01138ae578d9a4de233b1fa5437e9824fb8e1a"
 }
