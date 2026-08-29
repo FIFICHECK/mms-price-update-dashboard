@@ -284,7 +284,7 @@ function showTab(t) {
   if (t==='log') renderLog();
 }
 function fmtTime(iso) { if(!iso) return '—'; try { var d=new Date(iso); if(isNaN(d)) return iso; return d.toLocaleString('zh-HK',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}); } catch(e){ return iso; } }
-function esc(s) { return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function esc(s) { return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
 
 function apiGet(url, cb) {
   fetch(url, {credentials:'include', headers:{'Accept':'application/vnd.github.v3+json'}})
