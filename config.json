@@ -6,7 +6,7 @@
         {
           "label": "Traffic Driver to KA Project",
           "time": "2026-08-28T00:00:00",
-          "end_time": "2026-12-31T23:58:00",
+          "end_time": "2026-12-31T23:59:00",
           "end_price": 368,
           "original_price": 499,
           "selling_price": 358,
@@ -23,5 +23,5 @@
       "last_updated": ""
     }
   },
-  "_sha": "1ed1d5eafeb6dea611e3fe4405fc224a839de53d"
+  "_sha": "5e01138ae578d9a4de233b1fa5437e9824fb8e1a"
 }
