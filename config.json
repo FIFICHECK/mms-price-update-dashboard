@@ -22,7 +22,8 @@
       ],
       "status": "active",
       "current_phase": 0,
-      "last_updated": "2026-08-30T02:48:40.956052"
+      "last_updated": "2026-08-30T02:50:00",
+      "verify_skip": true
     }
   }
 }
