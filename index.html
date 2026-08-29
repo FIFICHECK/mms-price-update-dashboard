@@ -253,7 +253,7 @@ function apiPut(url, content, sha, msg, cb, attempt) {
   attempt = attempt || 1;
   var body = {message: msg, content: btoa(unescape(encodeURIComponent(content))), branch: B};
   if (sha) body.sha = sha;
-  fetch(url, {method:'PUT', credentials:'include', headers:{'Accept':'application/vnd.github.v3+json'}, body: JSON.stringify(body)})
+  fetch(url, {method:'POST', credentials:'include', headers:{'Accept':'application/vnd.github.v3+json'}, body: JSON.stringify(body)})
     .then(function(r){ return r.json().then(function(j){ return {ok: r.ok, j: j}; }); })
     .then(function(res){
       if (res.ok) { cb(null, res.j); }
