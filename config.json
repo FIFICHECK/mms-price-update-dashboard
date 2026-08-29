@@ -16,12 +16,13 @@
           "discount_style": [
             "RED"
           ],
-          "promo_done": true
+          "promo_done": null,
+          "revert_done": null
         }
       ],
-      "status": "active",
-      "current_phase": 0,
-      "last_updated": "2026-08-29T12:30:32.395480"
+      "status": "pending",
+      "current_phase": -1,
+      "last_updated": ""
     }
   }
 }
