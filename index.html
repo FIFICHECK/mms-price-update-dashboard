@@ -224,9 +224,9 @@
 // ========== GitHub config ==========
 var R = 'FIFICHECK/mms-price-update-dashboard';
 var B = 'master';
-var TK = ('ghp_' + '***REMOVED_TOKEN***');
-var CU = 'https://api.github.com/repos/' + R + '/contents/config.json?ref=' + B;
-var DU = 'https://api.github.com/repos/' + R + '/contents/dashboard_data.json?ref=' + B;
+var PX = 'https://fificheck-write-proxy.fificheck.workers.dev';
+var CU = PX + '/api/repos/' + R + '/contents/config.json';
+var DU = PX + '/api/repos/' + R + '/contents/dashboard_data.json';
 var config = {skus:{}};
 var hist = {history:[]};
 
@@ -243,7 +243,7 @@ function fmtTime(iso) { if(!iso) return '—'; try { var d=new Date(iso); if(isN
 function esc(s) { return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 
 function apiGet(url, cb) {
-  fetch(url, {headers:{'Authorization':'token '+TK, 'Accept':'application/vnd.github.v3+json'}})
+  fetch(url, {credentials:'include', headers:{'Accept':'application/vnd.github.v3+json'}})
     .then(function(r){ return r.ok ? r.json() : Promise.reject('HTTP '+r.status); })
     .then(function(j){ cb(null, j); })
     .catch(function(e){ cb(e); });
@@ -253,7 +253,7 @@ function apiPut(url, content, sha, msg, cb, attempt) {
   attempt = attempt || 1;
   var body = {message: msg, content: btoa(unescape(encodeURIComponent(content))), branch: B};
   if (sha) body.sha = sha;
-  fetch(url, {method:'PUT', headers:{'Authorization':'token '+TK, 'Accept':'application/vnd.github.v3+json'}, body: JSON.stringify(body)})
+  fetch(url, {method:'PUT', credentials:'include', headers:{'Accept':'application/vnd.github.v3+json'}, body: JSON.stringify(body)})
     .then(function(r){ return r.json().then(function(j){ return {ok: r.ok, j: j}; }); })
     .then(function(res){
       if (res.ok) { cb(null, res.j); }
@@ -574,6 +574,21 @@ setInterval(function(){
   el.title = '下次自動刷新: '+new Date(autoRefreshNextTs).toLocaleString('zh-HK');
 }, 1000);
 setInterval(function(){ autoRefreshNextTs = Date.now() + AUTO_REFRESH_MS; fetchData(function(e){}); }, AUTO_REFRESH_MS);
+
+// ===== Login gate (2026-08-28) — proxy requires Cloudflare Access login =====
+function checkLogin(){
+  fetch(PX+'/api/health',{credentials:'include'}).then(function(r){
+    return r.json().then(function(j){ if(!j||!j.ok) showLoginBanner(); }).catch(function(){ showLoginBanner(); });
+  }).catch(function(){});
+}
+function showLoginBanner(){
+  if(document.getElementById('loginBanner'))return;
+  var b=document.createElement('div');b.id='loginBanner';
+  b.style.cssText='position:fixed;top:0;left:0;right:0;z-index:9999;background:#e94560;color:#fff;padding:10px 12px;text-align:center;font-size:0.85rem;font-weight:bold';
+  b.innerHTML='🔐 未登入 — 儲存功能暫停。 <a href="'+PX+'" target="_blank" style="color:#fff;text-decoration:underline">按此登入（email + 一次性驗證碼）</a>';
+  document.body.prepend(b);
+}
+checkLogin();
 </script>
 </body>
 </html>
