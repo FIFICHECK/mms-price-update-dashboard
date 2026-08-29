@@ -579,9 +579,11 @@ setInterval(function(){ autoRefreshNextTs = Date.now() + AUTO_REFRESH_MS; fetchD
 function checkLogin(){
   fetch(PX+'/api/health',{credentials:'include',redirect:'manual'}).then(function(r){
     if(r.type==='opaqueredirect'||r.status===0||r.status===302){ showLoginBanner(); return; }
-    r.json().then(function(j){ if(!j||!j.ok) showLoginBanner(); }).catch(function(){ showLoginBanner(); });
+    r.json().then(function(j){ if(j&&j.ok) hideLoginBanner(); else showLoginBanner(); }).catch(function(){ showLoginBanner(); });
   }).catch(function(){ showLoginBanner(); });
 }
+function hideLoginBanner(){ var b=document.getElementById('loginBanner'); if(b) b.remove(); }
+window.addEventListener('focus', checkLogin);
 function showLoginBanner(){
   if(document.getElementById('loginBanner'))return;
   var b=document.createElement('div');b.id='loginBanner';
