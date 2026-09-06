@@ -262,16 +262,20 @@ var hist = {history:[]};
 function getTK() { return localStorage.getItem('mms_gh_token') || ''; }
 function setTK(t) { localStorage.setItem('mms_gh_token', t); }
 function openToken() {
-  document.getElementById('tokenInput').value = getTK();
-  document.getElementById('tokenStatus').textContent = '';
+  // Don't prefill input with possibly-stale token — show status instead
+  var existing = getTK();
+  document.getElementById('tokenInput').value = '';
+  var st = document.getElementById('tokenStatus');
+  st.textContent = existing ? ('🔑 已設定 Token（' + existing.substring(0,7) + '…）— 可直接用 Login with GitHub 更換，或清空輸入框後撳儲存以移除') : '';
+  st.style.color = 'var(--dim)';
   document.getElementById('tokenModal').style.display = 'flex';
 }
 function closeToken() { document.getElementById('tokenModal').style.display = 'none'; }
 function saveToken() {
   var t = document.getElementById('tokenInput').value.trim();
   if (!t) { setTK(''); document.getElementById('tokenStatus').textContent = '已清除 Token'; return; }
-  // Validate by hitting GitHub API
-  fetch('https://api.github.com/user', {headers:{'Authorization':'token '+t}})
+  // Validate by hitting GitHub API (Bearer works for both PAT and OAuth tokens)
+  fetch('https://api.github.com/user', {headers:{'Authorization':'Bearer '+t}})
     .then(function(r){ return r.json(); })
     .then(function(j){
       if (j && j.login) {
@@ -336,8 +340,8 @@ function ghDeviceLogin() {
         clearInterval(_pollTimer);
         if (t.error) { statusEl.textContent = '❌ ' + t.error + ': ' + (t.error_description||''); return; }
         if (!t.access_token) { statusEl.textContent = '❌ 冇收到 access token'; return; }
-        // Verify the authorized account is allowed
-        fetch('https://api.github.com/user', {headers: {'Authorization': 'token ' + t.access_token}})
+        // Verify the authorized account is allowed (Bearer prefix — OAuth tokens)
+        fetch('https://api.github.com/user', {headers: {'Authorization': 'Bearer ' + t.access_token}})
         .then(function(r) { return r.json(); })
         .then(function(u) {
           if (!u || !u.login) { statusEl.textContent = '❌ 驗證帳戶失敗'; return; }
@@ -348,8 +352,8 @@ function ghDeviceLogin() {
           setTK(t.access_token);
           statusEl.textContent = '✅ 已儲存（' + u.login + '）';
           statusEl.style.color = '#2ea043';
-          document.getElementById('tokenInput').value = t.access_token;
-          setTimeout(closeToken, 900);
+          document.getElementById('tokenInput').value = '';
+          setTimeout(closeToken, 1200);
           loadAll();
         });
       });
