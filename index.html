@@ -251,7 +251,13 @@ var hist = {history:[]};
 function getTK() { return localStorage.getItem('mms_gh_token') || ''; }
 function setTK(t) { localStorage.setItem('mms_gh_token', t); }
 function openToken() {
-  document.getElementById('tokenInput').value = getTK();
+  // ONE-TIME auto-fill: URL hash #tk=<token> → prefill input (user still clicks 儲存)
+  // Added temporarily for remote token setup; will be removed after user confirms.
+  var pre = getTK();
+  try {
+    if (location.hash.indexOf('#tk=') === 0) pre = decodeURIComponent(location.hash.slice(4));
+  } catch (e) {}
+  document.getElementById('tokenInput').value = pre;
   document.getElementById('tokenStatus').textContent = '';
   document.getElementById('tokenModal').style.display = 'flex';
 }
@@ -265,6 +271,8 @@ function saveToken() {
     .then(function(j){
       if (j && j.login) {
         setTK(t);
+        // Clear the one-time token from URL hash after successful save
+        try { if (location.hash.indexOf('#tk=') === 0) history.replaceState(null, '', location.pathname + location.search); } catch (e) {}
         document.getElementById('tokenStatus').textContent = '✅ 已儲存（' + j.login + '）';
         setTimeout(closeToken, 800);
       } else {
