@@ -287,6 +287,7 @@ function saveToken() {
 
 // ========== GitHub OAuth Device Flow (Login with GitHub) ==========
 var OAUTH_CLIENT_ID = 'Ov23liErtHlt9kMnjHcD';
+var OAUTH_PROXY = 'https://fificheck-oauth-proxy.fificheck.workers.dev';  // CORS proxy (Cloudflare Worker)
 var ALLOWED_LOGINS = ['FIFICHECK'];  // only these GitHub accounts may authorize writes
 var _pollTimer = null;
 
@@ -299,7 +300,7 @@ function ghDeviceLogin() {
   statusEl.textContent = '⏳ 攞緊授權碼…';
   statusEl.style.color = 'var(--dim)';
 
-  fetch('https://github.com/login/device/code', {
+  fetch(OAUTH_PROXY + '/api/device/code', {
     method: 'POST',
     headers: {'Content-Type': 'application/json', 'Accept': 'application/json'},
     body: JSON.stringify({client_id: OAUTH_CLIENT_ID, scope: 'repo'})
@@ -320,7 +321,7 @@ function ghDeviceLogin() {
         statusEl.textContent = '⏰ 授權逾時，請再撳一次 Login with GitHub';
         return;
       }
-      fetch('https://github.com/login/oauth/access_token', {
+      fetch(OAUTH_PROXY + '/api/device/token', {
         method: 'POST',
         headers: {'Content-Type': 'application/json', 'Accept': 'application/json'},
         body: JSON.stringify({
