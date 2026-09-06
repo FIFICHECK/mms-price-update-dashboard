@@ -225,8 +225,19 @@
 <div class="modal" id="tokenModal" onclick="if(event.target===this)closeToken()">
   <div class="modal-box">
     <h2>🔑 GitHub Token 設定</h2>
-    <p style="color:var(--dim);font-size:0.85rem">寫入（新增/編輯/刪除 SKU）需要 GitHub Token。Token 只存喺你瀏覽器（localStorage），唔會上傳或 commit 出街。讀取唔需要 Token。</p>
-    <p style="color:var(--dim);font-size:0.85rem">Token 需要 <code>repo</code> scope。建立：GitHub → Settings → Developer settings → Personal access tokens → Fine-grained tokens（選 <code>FIFICHECK/mms-price-update-dashboard</code> repo + Contents read/write）</p>
+    <p style="color:var(--dim);font-size:0.85rem">寫入（新增/編輯/刪除 SKU）需要 GitHub 授權。Token 只存喺你瀏覽器（localStorage），唔會上傳或 commit 出街。讀取唔需要授權。</p>
+    <button onclick="ghDeviceLogin()" style="width:100%;padding:10px;margin:4px 0;background:#24292f;color:#fff;border:none;border-radius:6px;font-size:0.95rem;cursor:pointer">🔐 Login with GitHub（推薦 — 唔使自己貼 Token）</button>
+    <div id="deviceFlow" style="display:none;background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:14px;margin:8px 0;text-align:center">
+      <p style="font-size:0.85rem;color:var(--dim);margin:0 0 6px">1️⃣ 去 <a href="https://github.com/login/device" target="_blank" rel="noopener">github.com/login/device</a> 用你嘅 GitHub 帳戶登入</p>
+      <p style="font-size:0.85rem;color:var(--dim);margin:0 0 6px">2️⃣ 輸入以下代碼：</p>
+      <div id="deviceCode" style="font-size:2rem;font-weight:700;letter-spacing:6px;padding:8px;background:var(--bg);border-radius:6px;margin:4px 0 8px">—</div>
+      <p id="deviceStatus" style="font-size:0.85rem;margin:0">⏳ 等待授權…</p>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px;margin:4px 0">
+      <div style="flex:1;border-top:1px solid var(--border)"></div>
+      <span style="color:var(--dim);font-size:0.8rem">或直接貼 Token</span>
+      <div style="flex:1;border-top:1px solid var(--border)"></div>
+    </div>
     <input type="password" id="tokenInput" placeholder="ghp_... 或 github_pat_..." style="width:100%;padding:8px;margin:8px 0;border:1px solid var(--border);border-radius:6px;background:var(--bg2);color:var(--fg)">
     <div style="display:flex;gap:8px">
       <button onclick="saveToken()">💾 儲存</button>
@@ -251,13 +262,7 @@ var hist = {history:[]};
 function getTK() { return localStorage.getItem('mms_gh_token') || ''; }
 function setTK(t) { localStorage.setItem('mms_gh_token', t); }
 function openToken() {
-  // ONE-TIME auto-fill: URL hash #tk=<token> → prefill input (user still clicks 儲存)
-  // Added temporarily for remote token setup; will be removed after user confirms.
-  var pre = getTK();
-  try {
-    if (location.hash.indexOf('#tk=') === 0) pre = decodeURIComponent(location.hash.slice(4));
-  } catch (e) {}
-  document.getElementById('tokenInput').value = pre;
+  document.getElementById('tokenInput').value = getTK();
   document.getElementById('tokenStatus').textContent = '';
   document.getElementById('tokenModal').style.display = 'flex';
 }
@@ -271,8 +276,6 @@ function saveToken() {
     .then(function(j){
       if (j && j.login) {
         setTK(t);
-        // Clear the one-time token from URL hash after successful save
-        try { if (location.hash.indexOf('#tk=') === 0) history.replaceState(null, '', location.pathname + location.search); } catch (e) {}
         document.getElementById('tokenStatus').textContent = '✅ 已儲存（' + j.login + '）';
         setTimeout(closeToken, 800);
       } else {
@@ -280,6 +283,78 @@ function saveToken() {
       }
     })
     .catch(function(e){ document.getElementById('tokenStatus').textContent = '❌ 驗證失敗: '+e; });
+}
+
+// ========== GitHub OAuth Device Flow (Login with GitHub) ==========
+var OAUTH_CLIENT_ID = 'Ov23liErtHlt9kMnjHcD';
+var ALLOWED_LOGINS = ['FIFICHECK'];  // only these GitHub accounts may authorize writes
+var _pollTimer = null;
+
+function ghDeviceLogin() {
+  var statusEl = document.getElementById('deviceStatus');
+  var flowEl = document.getElementById('deviceFlow');
+  var codeEl = document.getElementById('deviceCode');
+  flowEl.style.display = 'block';
+  codeEl.textContent = '…';
+  statusEl.textContent = '⏳ 攞緊授權碼…';
+  statusEl.style.color = 'var(--dim)';
+
+  fetch('https://github.com/login/device/code', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json', 'Accept': 'application/json'},
+    body: JSON.stringify({client_id: OAUTH_CLIENT_ID, scope: 'repo'})
+  })
+  .then(function(r) { return r.json(); })
+  .then(function(d) {
+    if (d.error) { statusEl.textContent = '❌ ' + d.error + ': ' + d.error_description; return; }
+    codeEl.textContent = d.user_code;
+    statusEl.textContent = '⏳ 等你去 github.com/login/device 入 code（' + Math.round(d.expires_in/60) + ' 分鐘內）…';
+    // Poll for authorization
+    var interval = Math.max(d.interval || 5, 5) * 1000;
+    var waited = 0;
+    if (_pollTimer) clearInterval(_pollTimer);
+    _pollTimer = setInterval(function() {
+      waited += interval;
+      if (waited > (d.expires_in || 900) * 1000) {
+        clearInterval(_pollTimer);
+        statusEl.textContent = '⏰ 授權逾時，請再撳一次 Login with GitHub';
+        return;
+      }
+      fetch('https://github.com/login/oauth/access_token', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json', 'Accept': 'application/json'},
+        body: JSON.stringify({
+          client_id: OAUTH_CLIENT_ID,
+          device_code: d.device_code,
+          grant_type: 'urn:ietf:params:oauth:grant-type:device_code'
+        })
+      })
+      .then(function(r) { return r.json(); })
+      .then(function(t) {
+        if (t.error === 'authorization_pending' || t.error === 'slow_down') return; // keep waiting
+        clearInterval(_pollTimer);
+        if (t.error) { statusEl.textContent = '❌ ' + t.error + ': ' + (t.error_description||''); return; }
+        if (!t.access_token) { statusEl.textContent = '❌ 冇收到 access token'; return; }
+        // Verify the authorized account is allowed
+        fetch('https://api.github.com/user', {headers: {'Authorization': 'token ' + t.access_token}})
+        .then(function(r) { return r.json(); })
+        .then(function(u) {
+          if (!u || !u.login) { statusEl.textContent = '❌ 驗證帳戶失敗'; return; }
+          if (ALLOWED_LOGINS.indexOf(u.login) === -1) {
+            statusEl.textContent = '❌ 帳戶 ' + u.login + ' 未授權使用（只限 ' + ALLOWED_LOGINS.join(', ') + '）';
+            return;
+          }
+          setTK(t.access_token);
+          statusEl.textContent = '✅ 已儲存（' + u.login + '）';
+          statusEl.style.color = '#2ea043';
+          document.getElementById('tokenInput').value = t.access_token;
+          setTimeout(closeToken, 900);
+          loadAll();
+        });
+      });
+    }, interval);
+  })
+  .catch(function(e) { statusEl.textContent = '❌ 連線失敗: ' + e; });
 }
 
 function showMsg(t, err) { var m=document.getElementById('msg'); m.textContent=t; m.className='msg'+(err?' err':''); m.style.display='block'; setTimeout(function(){m.style.display='none';}, 3500); }
