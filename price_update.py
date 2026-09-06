@@ -29,6 +29,21 @@ if os.path.exists(_creds_path):
     except Exception as e:
         print(f'⚠️  mms_creds.json read failed: {e}')
 
+# Unified creds file (~/.mms_credentials) — MMS_JERRY_EMAIL / MMS_JERRY_PASSWORD (chmod 600)
+_mms_creds_uni = os.path.expanduser('~/.mms_credentials')
+if (not MMS_EMAIL or not MMS_PASSWORD) and os.path.exists(_mms_creds_uni):
+    try:
+        with open(_mms_creds_uni) as f:
+            for line in f:
+                line = line.strip()
+                if line.startswith('MMS_JERRY_EMAIL='):
+                    MMS_EMAIL = line.split('=', 1)[1].strip().strip('"').strip("'")
+                elif line.startswith('MMS_JERRY_PASSWORD='):
+                    MMS_PASSWORD = line.split('=', 1)[1].strip().strip('"').strip("'")
+        print('⚙️  Using ~/.mms_credentials')
+    except Exception as e:
+        print(f'⚠️  ~/.mms_credentials read failed: {e}')
+
 
 if not MMS_EMAIL or not MMS_PASSWORD:
     sys.exit("❌ MMS credentials not configured — set MMS_EMAIL/MMS_PASSWORD env or local mms_creds.json")
