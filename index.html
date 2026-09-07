@@ -79,8 +79,9 @@
   <button class="tab active" onclick="showTab('list')" id="tab-list">📋 SKU 列表</button>
   <button class="tab" onclick="showTab('add')" id="tab-add">➕ 新增/編輯</button>
   <button class="tab" onclick="showTab('log')" id="tab-log">📝 更新記錄</button>
-  <button class="tab" style="margin-left:auto" onclick="openToken()" id="tab-token">🔑 Token</button>
+  <button class="tab" style="margin-left:auto" onclick="openToken()" id="tab-token">🔐 登入 / Email 驗證</button>
 </div>
+<div id="loginBanner" style="display:none;position:fixed;top:0;left:0;right:0;z-index:9999;background:#e94560;color:#fff;padding:10px 12px;text-align:center;font-size:0.85rem;font-weight:bold;cursor:pointer" onclick="window.open(PX,'_blank')">🔐 未登入 — 儲存功能暫停。撳呢度登入（Email + 一次性驗證碼），登入後返嚟此頁即可正常儲存</div>
 
 <!-- Tab 1: SKU List -->
 <div id="tab-list-panel">
@@ -224,25 +225,9 @@
 <!-- Token Modal -->
 <div class="modal" id="tokenModal" onclick="if(event.target===this)closeToken()">
   <div class="modal-box">
-    <h2>🔑 GitHub Token 設定</h2>
-    <p style="color:var(--dim);font-size:0.85rem">寫入（新增/編輯/刪除 SKU）需要 GitHub 授權。Token 只存喺你瀏覽器（localStorage），唔會上傳或 commit 出街。讀取唔需要授權。</p>
-    <button onclick="ghDeviceLogin()" style="width:100%;padding:10px;margin:4px 0;background:#24292f;color:#fff;border:none;border-radius:6px;font-size:0.95rem;cursor:pointer">🔐 Login with GitHub（推薦 — 唔使自己貼 Token）</button>
-    <div id="deviceFlow" style="display:none;background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:14px;margin:8px 0;text-align:center">
-      <p style="font-size:0.85rem;color:var(--dim);margin:0 0 6px">1️⃣ 去 <a href="https://github.com/login/device" target="_blank" rel="noopener">github.com/login/device</a> 用你嘅 GitHub 帳戶登入</p>
-      <p style="font-size:0.85rem;color:var(--dim);margin:0 0 6px">2️⃣ 輸入以下代碼：</p>
-      <div id="deviceCode" style="font-size:2rem;font-weight:700;letter-spacing:6px;padding:8px;background:var(--bg);border-radius:6px;margin:4px 0 8px">—</div>
-      <p id="deviceStatus" style="font-size:0.85rem;margin:0">⏳ 等待授權…</p>
-    </div>
-    <div style="display:flex;align-items:center;gap:8px;margin:4px 0">
-      <div style="flex:1;border-top:1px solid var(--border)"></div>
-      <span style="color:var(--dim);font-size:0.8rem">或直接貼 Token</span>
-      <div style="flex:1;border-top:1px solid var(--border)"></div>
-    </div>
-    <input type="password" id="tokenInput" placeholder="ghp_... 或 github_pat_..." style="width:100%;padding:8px;margin:8px 0;border:1px solid var(--border);border-radius:6px;background:var(--bg2);color:var(--fg)">
-    <div style="display:flex;gap:8px">
-      <button onclick="saveToken()">💾 儲存</button>
-      <button class="secondary" onclick="closeToken()">取消</button>
-    </div>
+    <h2>🔐 登入（Email 驗證）</h2>
+    <p style="color:var(--dim);font-size:0.85rem">寫入（新增/編輯/刪除 SKU）需要 Email 驗證登入。撳下面按鈕 → 輸入你嘅 Email → 收一次性驗證碼 → 登入後即可儲存。Token 唔需要，亦唔會儲存喺呢部機。</p>
+    <button onclick="startEmailLogin()" style="width:100%;padding:12px;margin:6px 0;background:#e94560;color:#fff;border:none;border-radius:8px;font-size:1rem;cursor:pointer">📧 用 Email 登入（一次性驗證碼）</button>
     <p id="tokenStatus" style="font-size:0.8rem;margin-top:8px"></p>
   </div>
 </div>
@@ -255,112 +240,57 @@ var RAW = 'https://raw.githubusercontent.com/' + R + '/' + B + '/';
 var CU = RAW + 'config.json';
 var DU = RAW + 'dashboard_data.json';
 var API = 'https://api.github.com/repos/' + R + '/contents/';
+var PX = 'https://fificheck-write-proxy.fificheck.workers.dev';  // Cloudflare Access-gated write proxy (email login, no token needed)
 var config = {skus:{}};
 var hist = {history:[]};
 
 // Write token stored in localStorage (user pastes once; never committed to repo)
-function getTK() { return localStorage.getItem('mms_gh_token') || ''; }
-function setTK(t) { localStorage.setItem('mms_gh_token', t); }
-function openToken() {
-  // Don't prefill input with possibly-stale token — show status instead
-  var existing = getTK();
-  document.getElementById('tokenInput').value = '';
+// ===== Email 驗證登入（Cloudflare Access gate 經 write-proxy，唔使自己有 Token）=====
+function getTK() { try { return localStorage.getItem('mms_gh_token') || ''; } catch(e){ return ''; } }
+function setTK(t) { try { localStorage.setItem('mms_gh_token', t); } catch(e){} }
+
+function checkLogin(cb) {
+  fetch(PX + '/api/health', {credentials:'include', redirect:'manual'})
+    .then(function(r){
+      var logged = !(r.type === 'opaqueredirect' || r.status === 0 || r.status === 302 || r.status === 401 || r.status === 403);
+      updateLoginUI(logged);
+      if (cb) cb(logged);
+    })
+    .catch(function(){ updateLoginUI(false); if (cb) cb(false); });
+}
+function updateLoginUI(logged) {
+  var b = document.getElementById('loginBanner');
+  var tab = document.getElementById('tab-token');
+  if (!b || !tab) return;
+  if (logged) {
+    b.style.display = 'none';
+    tab.textContent = '🔐 已登入 ✅';
+    tab.style.color = '#3fb950';
+  } else {
+    b.style.display = 'block';
+    tab.textContent = '🔐 登入 / Email 驗證';
+    tab.style.color = '';
+  }
+}
+function startEmailLogin() {
   var st = document.getElementById('tokenStatus');
-  st.textContent = existing ? ('🔑 已設定 Token（' + existing.substring(0,7) + '…）— 可直接用 Login with GitHub 更換，或清空輸入框後撳儲存以移除') : '';
+  if (!st) return;
+  st.textContent = '⏳ 開緊 Cloudflare Access 登入頁（新分頁）…';
   st.style.color = 'var(--dim)';
+  window.open(PX, '_blank', 'noopener');
+  st.textContent = '📧 喺新分頁輸入你嘅 Email → 收一次性驗證碼 → 入 code 登入。完成後返嚟此頁撳「🔄 刷新」，見到「🔐 已登入 ✅」就正常儲得。';
+}
+function openToken() {
+  var st = document.getElementById('tokenStatus');
   document.getElementById('tokenModal').style.display = 'flex';
+  if (st) { st.textContent = ''; st.style.color = ''; }
+  checkLogin(function(logged){
+    if (!st) return;
+    if (logged) { st.textContent = '✅ 已登入 — 可以直接新增/編輯/儲存 SKU'; st.style.color = '#3fb950'; }
+    else { st.textContent = '❌ 未登入 — 撳上面「📧 用 Email 登入」，完成後返嚟撳「🔄 刷新」'; st.style.color = '#f85149'; }
+  });
 }
 function closeToken() { document.getElementById('tokenModal').style.display = 'none'; }
-function saveToken() {
-  var t = document.getElementById('tokenInput').value.trim();
-  if (!t) { setTK(''); document.getElementById('tokenStatus').textContent = '已清除 Token'; return; }
-  // Validate by hitting GitHub API (Bearer works for both PAT and OAuth tokens)
-  fetch('https://api.github.com/user', {headers:{'Authorization':'Bearer '+t}})
-    .then(function(r){ return r.json(); })
-    .then(function(j){
-      if (j && j.login) {
-        setTK(t);
-        document.getElementById('tokenStatus').textContent = '✅ 已儲存（' + j.login + '）';
-        setTimeout(closeToken, 800);
-      } else {
-        document.getElementById('tokenStatus').textContent = '❌ Token 無效（' + (j.message||'?') + '）';
-      }
-    })
-    .catch(function(e){ document.getElementById('tokenStatus').textContent = '❌ 驗證失敗: '+e; });
-}
-
-// ========== GitHub OAuth Device Flow (Login with GitHub) ==========
-var OAUTH_CLIENT_ID = 'Ov23liErtHlt9kMnjHcD';
-var OAUTH_PROXY = 'https://fificheck-oauth-proxy.fificheck.workers.dev';  // CORS proxy (Cloudflare Worker)
-var ALLOWED_LOGINS = ['FIFICHECK'];  // only these GitHub accounts may authorize writes
-var _pollTimer = null;
-
-function ghDeviceLogin() {
-  var statusEl = document.getElementById('deviceStatus');
-  var flowEl = document.getElementById('deviceFlow');
-  var codeEl = document.getElementById('deviceCode');
-  flowEl.style.display = 'block';
-  codeEl.textContent = '…';
-  statusEl.textContent = '⏳ 攞緊授權碼…';
-  statusEl.style.color = 'var(--dim)';
-
-  fetch(OAUTH_PROXY + '/api/device/code', {
-    method: 'POST',
-    headers: {'Content-Type': 'application/json', 'Accept': 'application/json'},
-    body: JSON.stringify({client_id: OAUTH_CLIENT_ID, scope: 'repo'})
-  })
-  .then(function(r) { return r.json(); })
-  .then(function(d) {
-    if (d.error) { statusEl.textContent = '❌ ' + d.error + ': ' + d.error_description; return; }
-    codeEl.textContent = d.user_code;
-    statusEl.textContent = '⏳ 等你去 github.com/login/device 入 code（' + Math.round(d.expires_in/60) + ' 分鐘內）…';
-    // Poll for authorization
-    var interval = Math.max(d.interval || 5, 5) * 1000;
-    var waited = 0;
-    if (_pollTimer) clearInterval(_pollTimer);
-    _pollTimer = setInterval(function() {
-      waited += interval;
-      if (waited > (d.expires_in || 900) * 1000) {
-        clearInterval(_pollTimer);
-        statusEl.textContent = '⏰ 授權逾時，請再撳一次 Login with GitHub';
-        return;
-      }
-      fetch(OAUTH_PROXY + '/api/device/token', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json', 'Accept': 'application/json'},
-        body: JSON.stringify({
-          client_id: OAUTH_CLIENT_ID,
-          device_code: d.device_code,
-          grant_type: 'urn:ietf:params:oauth:grant-type:device_code'
-        })
-      })
-      .then(function(r) { return r.json(); })
-      .then(function(t) {
-        if (t.error === 'authorization_pending' || t.error === 'slow_down') return; // keep waiting
-        clearInterval(_pollTimer);
-        if (t.error) { statusEl.textContent = '❌ ' + t.error + ': ' + (t.error_description||''); return; }
-        if (!t.access_token) { statusEl.textContent = '❌ 冇收到 access token'; return; }
-        // Verify the authorized account is allowed (Bearer prefix — OAuth tokens)
-        fetch('https://api.github.com/user', {headers: {'Authorization': 'Bearer ' + t.access_token}})
-        .then(function(r) { return r.json(); })
-        .then(function(u) {
-          if (!u || !u.login) { statusEl.textContent = '❌ 驗證帳戶失敗'; return; }
-          if (ALLOWED_LOGINS.indexOf(u.login) === -1) {
-            statusEl.textContent = '❌ 帳戶 ' + u.login + ' 未授權使用（只限 ' + ALLOWED_LOGINS.join(', ') + '）';
-            return;
-          }
-          setTK(t.access_token);
-          statusEl.textContent = '✅ 已儲存（' + u.login + '）';
-          statusEl.style.color = '#2ea043';
-          document.getElementById('tokenInput').value = '';
-          setTimeout(closeToken, 1200);
-          loadAll();
-        });
-      });
-    }, interval);
-  })
-  .catch(function(e) { statusEl.textContent = '❌ 連線失敗: ' + e; });
-}
 
 function showMsg(t, err) { var m=document.getElementById('msg'); m.textContent=t; m.className='msg'+(err?' err':''); m.style.display='block'; setTimeout(function(){m.style.display='none';}, 3500); }
 function showTab(t) {
@@ -383,19 +313,31 @@ function apiGet(url, cb) {
 function b64decode(s) { return decodeURIComponent(escape(atob(s))); }
 function apiPut(file, content, sha, msg, cb, attempt) {
   attempt = attempt || 1;
-  var tk = getTK();
-  if (!tk) { cb('未設定 Token — 撳右上「🔑 Token」輸入'); return; }
-  var url = API + file + '?ref=' + B;
-  var body = {message: msg, content: btoa(unescape(encodeURIComponent(content))), branch: B};
-  if (sha) body.sha = sha;
-  fetch(url, {method:'PUT', headers:{'Authorization':'token '+tk, 'Accept':'application/vnd.github.v3+json'}, body: JSON.stringify(body)})
-    .then(function(r){ return r.json().then(function(j){ return {ok: r.ok, j: j}; }); })
-    .then(function(res){
-      if (res.ok) { cb(null, res.j); }
-      else if (attempt < 5) { setTimeout(function(){ apiPut(file, content, null, msg, cb, attempt+1); }, 1500); }
-      else { cb(res.j && res.j.message || 'save failed'); }
+  // Write via Cloudflare Access-gated proxy — no client token needed (email login session)
+  function doSave() {
+    var url = PX + '/api/repos/' + R + '/contents/' + file;
+    var body = {message: msg, content: btoa(unescape(encodeURIComponent(content))), branch: B};
+    if (sha) body.sha = sha;
+    fetch(url, {method:'POST', credentials:'include', headers:{'Content-Type':'text/plain','Accept':'application/vnd.github.v3+json'}, body: JSON.stringify(body)})
+      .then(function(r){ return r.json().then(function(j){ return {ok: r.ok, j: j}; }); })
+      .then(function(res){
+        if (res.ok) { cb(null, res.j); }
+        else if (res.j && res.j.message === 'Bad credentials') { cb('登入已過期 — 請撳右上「🔐 登入」重新驗證 Email'); }
+        else if (attempt < 5) { setTimeout(function(){ apiPut(file, content, null, msg, cb, attempt+1); }, 1500); }
+        else { cb(res.j && res.j.message || 'save failed'); }
+      })
+      .catch(function(e){ if (attempt<5){ setTimeout(function(){ apiPut(file, content, null, msg, cb, attempt+1); },1500); } else cb(e); });
+  }
+  // Fetch latest sha via proxy first if we don't have one
+  if (sha) { doSave(); return; }
+  fetch(PX + '/api/repos/' + R + '/contents/' + file, {credentials:'include', headers:{'Accept':'application/vnd.github.v3+json'}})
+    .then(function(r){ return r.json(); })
+    .then(function(i){
+      if (!i || !i.sha) { cb('讀唔到檔案 SHA（' + (i && i.message || 'unknown') + '）— 請確認已登入'); return; }
+      sha = i.sha;
+      doSave();
     })
-    .catch(function(e){ if (attempt<5){ setTimeout(function(){ apiPut(file, content, null, msg, cb, attempt+1); },1500); } else cb(e); });
+    .catch(function(e){ if (attempt<5){ setTimeout(function(){ apiPut(file, content, null, msg, cb, attempt+1); },1500); } else cb('SHA fetch failed: '+e); });
 }
 
 function fetchData(cb) {
@@ -686,6 +628,8 @@ document.addEventListener('keydown', function(e){ if(e.key==='Escape') closeHelp
 
 // Init
 fetchData(function(e){ if(e) showMsg('⚠️ 載入失敗: '+e, true); else { renderList(); renderLog(); } });
+checkLogin(function(logged){ if (!logged) showMsg('🔐 未登入 — 儲存功能暫停，撳右上「🔐 登入 / Email 驗證」', true); });
+window.addEventListener('focus', function(){ checkLogin(); });
 var AUTO_REFRESH_MS = 120000;
 var autoRefreshNextTs = Date.now() + AUTO_REFRESH_MS;
 setInterval(function(){
